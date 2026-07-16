@@ -2,7 +2,7 @@
 /**
  * Plugin Name: 안전 파일 관리자
  * Description: 워드프레스 관리자 화면에서 서버 파일을 직접 열람·편집·업로드·다운로드할 수 있는 파일 관리자. 취약한 WP File Manager(elFinder) 대체용으로, 모든 동작이 관리자 권한(manage_options) + nonce 로만 실행됩니다. GitHub 릴리스 기반 자동 업데이트 포함.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: You
  * License: GPL-2.0+
  * Text Domain: safe-file-manager
@@ -16,7 +16,7 @@ if ( defined( 'SFM_VERSION' ) ) {
 	return;
 }
 
-define( 'SFM_VERSION', '1.0.2' );
+define( 'SFM_VERSION', '1.0.3' );
 define( 'SFM_FILE', __FILE__ );
 define( 'SFM_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SFM_URL', plugin_dir_url( __FILE__ ) );
@@ -55,14 +55,12 @@ if ( is_admin() || ( function_exists( 'wp_doing_cron' ) && wp_doing_cron() ) ) {
 	SFM_Updater::init( SFM_UPDATE_REPO, plugin_basename( SFM_FILE ), SFM_UPDATE_TOKEN );
 }
 
-// 설정의 "자동 업데이트"가 켜져 있으면 이 플러그인 자동 설치 허용.
+// 이 플러그인은 항상 자동 업데이트(새 릴리스가 올라오면 WP 가 자동 설치).
 add_filter(
 	'auto_update_plugin',
 	function ( $update, $item ) {
 		if ( is_object( $item ) && isset( $item->plugin ) && plugin_basename( SFM_FILE ) === $item->plugin ) {
-			if ( get_option( 'sfm_auto_update' ) ) {
-				return true;
-			}
+			return true;
 		}
 		return $update;
 	},
@@ -155,6 +153,5 @@ add_action( 'wp_ajax_sfm_rename', array( 'SFM_Ajax', 'rename' ) );
 add_action( 'wp_ajax_sfm_delete', array( 'SFM_Ajax', 'delete' ) );
 add_action( 'wp_ajax_sfm_upload', array( 'SFM_Ajax', 'upload' ) );
 add_action( 'wp_ajax_sfm_download', array( 'SFM_Ajax', 'download' ) );
-add_action( 'wp_ajax_sfm_toggle_autoupdate', array( 'SFM_Ajax', 'toggle_autoupdate' ) );
 add_action( 'wp_ajax_sfm_check_update', array( 'SFM_Ajax', 'check_update' ) );
 add_action( 'wp_ajax_sfm_do_update', array( 'SFM_Ajax', 'do_update' ) );

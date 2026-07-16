@@ -83,8 +83,7 @@
 }
 .sfm-update-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .sfm-update-status { color: #646970; font-size: 13px; }
-.sfm-autoupdate { margin: 12px 0 0; color: #1d2327; }
-.sfm-autoupdate-hint { color: #646970; font-size: 12px; margin-left: 4px; }
+.sfm-autoupdate-note { margin: 12px 0 0; color: #50575e; font-size: 13px; line-height: 1.6; }
 
 /* 모달 */
 .sfm-modal {

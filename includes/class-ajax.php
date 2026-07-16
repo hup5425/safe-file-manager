@@ -133,13 +133,6 @@ class SFM_Ajax {
 		exit;
 	}
 
-	public static function toggle_autoupdate() {
-		self::guard();
-		$on = ! empty( $_POST['on'] ) ? 1 : 0;
-		update_option( 'sfm_auto_update', $on );
-		wp_send_json_success( array( 'on' => $on ) );
-	}
-
 	/**
 	 * 지금 업데이트 확인 — 캐시 비우고 강제 재검사 후 결과 반환.
 	 */

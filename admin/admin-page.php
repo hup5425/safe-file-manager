@@ -9,8 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$sfm_base    = SFM_FM::base_dir();
-$sfm_auto_on = (bool) get_option( 'sfm_auto_update' );
+$sfm_base = SFM_FM::base_dir();
 ?>
 <div class="wrap sfm-wrap">
 	<h1 class="sfm-title">
@@ -66,16 +65,12 @@ $sfm_auto_on = (bool) get_option( 'sfm_auto_update' );
 
 	<div class="sfm-update-box">
 		<div class="sfm-update-row">
-			<button class="button" id="sfm-check-update">🔄 지금 업데이트 확인</button>
-			<button class="button button-primary" id="sfm-do-update" hidden>업데이트 설치</button>
+			<button class="button button-primary" id="sfm-update-btn" data-mode="check">🔄 지금 업데이트 확인</button>
 			<span class="sfm-update-status" id="sfm-update-status">현재 버전 v<?php echo esc_html( SFM_VERSION ); ?></span>
 		</div>
-		<p class="sfm-autoupdate">
-			<label>
-				<input type="checkbox" id="sfm-autoupdate" <?php checked( $sfm_auto_on ); ?>>
-				새 버전이 올라오면 자동으로 업데이트
-			</label>
-			<span class="sfm-autoupdate-hint">(꺼도 위 "지금 업데이트 확인"으로 수동 설치할 수 있습니다)</span>
+		<p class="sfm-autoupdate-note">
+			ℹ️ 새 버전이 올라오면 <strong>자동으로 업데이트</strong>됩니다.
+			워드프레스가 약 <strong>12시간마다</strong> 새 버전을 확인하므로, 빠르게 적용하려면 위 "지금 업데이트 확인"을 누르세요.
 		</p>
 	</div>
 </div>

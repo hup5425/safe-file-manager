@@ -330,8 +330,14 @@
 
 	var updLatest = '';
 
+	// 버튼 1개: 평소엔 "확인", 새 버전 감지 후엔 "설치"로 바뀐다.
+	function onUpdateBtn() {
+		var btn = $( 'sfm-update-btn' );
+		if ( btn.dataset.mode === 'install' ) { doUpdate(); } else { checkUpdate(); }
+	}
+
 	function checkUpdate() {
-		var btn = $( 'sfm-check-update' );
+		var btn = $( 'sfm-update-btn' );
 		var status = $( 'sfm-update-status' );
 		btn.disabled = true;
 		status.textContent = '확인 중…';
@@ -341,32 +347,32 @@
 			var d = res.data;
 			if ( d.has_update ) {
 				updLatest = d.latest;
+				btn.dataset.mode = 'install';
+				btn.textContent = '⬇ v' + d.latest + ' 업데이트 설치';
 				status.textContent = '새 버전 v' + d.latest + ' 있음 (현재 v' + d.current + ')';
-				var dob = $( 'sfm-do-update' );
-				dob.hidden = false;
-				dob.textContent = 'v' + d.latest + ' 설치';
 			} else {
+				btn.dataset.mode = 'check';
+				btn.textContent = '🔄 지금 업데이트 확인';
 				status.textContent = '최신 버전입니다 (v' + d.current + ')';
-				$( 'sfm-do-update' ).hidden = true;
 			}
 		} ).catch( function () { btn.disabled = false; status.textContent = '네트워크 오류'; } );
 	}
 
 	function doUpdate() {
-		var dob = $( 'sfm-do-update' );
+		var btn = $( 'sfm-update-btn' );
 		var status = $( 'sfm-update-status' );
 		if ( ! confirm( 'v' + updLatest + ' 로 업데이트할까요?' ) ) { return; }
-		dob.disabled = true;
+		btn.disabled = true;
 		status.textContent = '업데이트 설치 중… (페이지를 닫지 마세요)';
 		post( 'sfm_do_update', {} ).then( function ( res ) {
 			if ( ! res.success ) {
-				dob.disabled = false;
+				btn.disabled = false;
 				status.textContent = ( res.data && res.data.msg ) || '업데이트 실패';
 				return;
 			}
 			status.textContent = res.data.msg || '업데이트 완료! 새로고침합니다…';
 			setTimeout( function () { location.reload(); }, 1200 );
-		} ).catch( function () { dob.disabled = false; status.textContent = '네트워크 오류'; } );
+		} ).catch( function () { btn.disabled = false; status.textContent = '네트워크 오류'; } );
 	}
 
 	/* ------------------------------ 이벤트 ------------------------------ */
@@ -422,14 +428,7 @@
 			}
 		} );
 
-		$( 'sfm-autoupdate' ).addEventListener( 'change', function ( e ) {
-			post( 'sfm_toggle_autoupdate', { on: e.target.checked ? 1 : 0 } ).then( function ( res ) {
-				if ( res.success ) { msg( res.data.on ? '자동 업데이트를 켰습니다.' : '자동 업데이트를 껐습니다.' ); }
-			} );
-		} );
-
-		$( 'sfm-check-update' ).addEventListener( 'click', checkUpdate );
-		$( 'sfm-do-update' ).addEventListener( 'click', doUpdate );
+		$( 'sfm-update-btn' ).addEventListener( 'click', onUpdateBtn );
 
 		initTree();
 		load( '' );
