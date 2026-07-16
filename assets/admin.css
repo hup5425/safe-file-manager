@@ -10,10 +10,40 @@
 .sfm-root-note code { font-size: 12px; }
 .sfm-sep { margin: 0 6px; color: #c3c4c7; }
 
+/* 2단 레이아웃(좌: 트리 / 우: 내용) */
+.sfm-body {
+	display: flex; align-items: stretch;
+	border: 1px solid #dcdcde; border-radius: 6px; overflow: hidden; background: #fff;
+}
+.sfm-tree {
+	width: 300px; min-width: 180px; flex: 0 0 auto;
+	border-right: 1px solid #dcdcde; background: #f6f7f7;
+	overflow: auto; max-height: 72vh; padding: 8px 4px;
+	resize: horizontal;
+}
+.sfm-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; max-height: 72vh; overflow: auto; }
+
+/* 트리 노드 */
+.sfm-node-row {
+	display: flex; align-items: center; gap: 3px; padding: 3px 6px;
+	cursor: pointer; white-space: nowrap; font-size: 13px; border-radius: 4px; user-select: none;
+}
+.sfm-node-row:hover { background: #eaeaeb; }
+.sfm-node-row.selected { background: #2271b1; color: #fff; }
+.sfm-toggle { width: 14px; flex: 0 0 auto; text-align: center; color: #787c82; }
+.sfm-node-row.selected .sfm-toggle { color: #fff; }
+.sfm-toggle::before { content: '▶'; font-size: 9px; display: inline-block; transition: transform .12s; }
+.sfm-node.expanded > .sfm-node-row > .sfm-toggle::before { transform: rotate(90deg); }
+.sfm-node.leaf > .sfm-node-row > .sfm-toggle::before { content: ''; }
+.sfm-node-icon { font-size: 13px; flex: 0 0 auto; }
+.sfm-node-label { overflow: hidden; text-overflow: ellipsis; }
+.sfm-children { display: none; margin-left: 14px; }
+.sfm-node.expanded > .sfm-children { display: block; }
+
 .sfm-toolbar {
 	display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-	background: #fff; border: 1px solid #dcdcde; border-radius: 6px;
-	padding: 10px 12px; margin-bottom: 12px;
+	background: #fff; border-bottom: 1px solid #dcdcde;
+	padding: 10px 12px; position: sticky; top: 0; z-index: 1;
 }
 .sfm-breadcrumb { flex: 1 1 320px; font-size: 14px; min-width: 220px; }
 .sfm-breadcrumb a { text-decoration: none; cursor: pointer; }
@@ -55,6 +85,9 @@
 	position: fixed; inset: 0; background: rgba(0,0,0,.45);
 	display: flex; align-items: center; justify-content: center; z-index: 100000;
 }
+/* display:flex 가 [hidden] 의 기본 display:none 을 덮어써서 빈 편집창이 항상 뜨던 문제 방지.
+   hidden 속성이 있을 땐 반드시 숨긴다(속성 선택자 특이도가 더 높아 우선 적용). */
+.sfm-modal[hidden] { display: none; }
 .sfm-modal-box {
 	background: #fff; border-radius: 8px; width: min(900px, 92vw);
 	max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.3);

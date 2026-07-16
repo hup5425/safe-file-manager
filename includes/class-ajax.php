@@ -81,7 +81,7 @@ class SFM_Ajax {
 		self::respond( SFM_FM::receive_upload( $parent, $file ) );
 	}
 
-	/** 파일 다운로드 — 스트림 전송(권한/nonce 확인 후). */
+	/** 파일/폴더 다운로드 — 파일은 그대로, 폴더는 zip 으로 스트림(권한/nonce 확인 후). */
 	public static function download() {
 		if ( ! current_user_can( SFM_CAP ) ) {
 			wp_die( '권한이 없습니다.' );
@@ -92,14 +92,30 @@ class SFM_Ajax {
 			wp_die( '보안 토큰이 유효하지 않습니다.' );
 		}
 		$rel = isset( $_GET['path'] ) ? wp_unslash( $_GET['path'] ) : '';
-		$abs = SFM_FM::download_path( $rel );
+		$abs = SFM_FM::resolve( $rel, true );
 		if ( is_wp_error( $abs ) ) {
 			wp_die( esc_html( $abs->get_error_message() ) );
 		}
 
+		$cleanup  = '';
+		$filename = basename( $abs );
+
+		if ( is_dir( $abs ) ) {
+			// 폴더 → 임시 zip 생성 후 스트림, 전송 끝나면 삭제.
+			$zip = SFM_FM::zip_dir( $rel );
+			if ( is_wp_error( $zip ) ) {
+				wp_die( esc_html( $zip->get_error_message() ) );
+			}
+			$abs      = $zip['path'];
+			$filename = $zip['name'];
+			$cleanup  = $zip['path'];
+		} elseif ( ! is_file( $abs ) ) {
+			wp_die( '다운로드할 수 없는 대상입니다.' );
+		}
+
 		nocache_headers();
 		header( 'Content-Type: application/octet-stream' );
-		header( 'Content-Disposition: attachment; filename="' . basename( $abs ) . '"' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
 		header( 'Content-Length: ' . filesize( $abs ) );
 		header( 'X-Content-Type-Options: nosniff' );
 		// 대용량도 안전하게 스트리밍.
@@ -110,6 +126,9 @@ class SFM_Ajax {
 				flush();
 			}
 			fclose( $fh );
+		}
+		if ( '' !== $cleanup ) {
+			@unlink( $cleanup ); // 임시 zip 정리.
 		}
 		exit;
 	}

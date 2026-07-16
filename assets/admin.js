@@ -2,8 +2,9 @@
 ( function () {
 	'use strict';
 
-	var cwd = ''; // 현재 폴더(base 기준 상대경로)
+	var cwd = '';        // 현재 폴더(base 기준 상대경로)
 	var el = {};
+	var nodeMap = {};    // rel -> 트리 노드 element
 
 	function $( id ) { return document.getElementById( id ); }
 
@@ -14,7 +15,7 @@
 	}
 
 	function fmtSize( bytes ) {
-		if ( bytes === 0 ) { return '—'; }
+		if ( ! bytes ) { return '—'; }
 		var u = [ 'B', 'KB', 'MB', 'GB', 'TB' ], i = 0, v = bytes;
 		while ( v >= 1024 && i < u.length - 1 ) { v /= 1024; i++; }
 		return ( i ? Math.round( v * 10 ) / 10 : v ) + ' ' + u[ i ];
@@ -46,7 +47,7 @@
 			.then( function ( r ) { return r.json(); } );
 	}
 
-	/* ------------------------------ 목록 렌더 ------------------------------ */
+	/* ------------------------------ 오른쪽: 폴더 내용 ------------------------------ */
 
 	function load( path ) {
 		el.list.innerHTML = '<tr><td colspan="5" class="sfm-loading">불러오는 중…</td></tr>';
@@ -54,6 +55,7 @@
 			if ( ! res.success ) { msg( res.data.msg || '오류', true ); return; }
 			cwd = res.data.path;
 			render( res.data );
+			revealInTree( cwd );
 		} ).catch( function () { msg( '네트워크 오류', true ); } );
 	}
 
@@ -78,20 +80,20 @@
 			}
 
 			var acts = [];
-			if ( e.type === 'file' ) {
-				if ( e.editable ) {
-					acts.push( '<a class="button-link" data-edit="' + esc( e.rel ) + '">편집</a>' );
-				}
-				acts.push( '<a class="button-link" data-download="' + esc( e.rel ) + '">다운로드</a>' );
+			if ( e.type === 'file' && e.editable ) {
+				acts.push( '<a class="button-link" data-edit="' + esc( e.rel ) + '">편집</a>' );
 			}
+			// 파일·폴더 모두 다운로드(폴더는 zip).
+			acts.push( '<a class="button-link" data-download="' + esc( e.rel ) + '">다운로드</a>' );
 			acts.push( '<a class="button-link" data-rename="' + esc( e.rel ) + '" data-name="' + esc( e.name ) + '">이름변경</a>' );
 			acts.push( '<a class="button-link sfm-del" data-delete="' + esc( e.rel ) + '" data-name="' + esc( e.name ) + '" data-type="' + e.type + '">삭제</a>' );
 
 			var ro = e.writable ? '' : ' <span class="sfm-ro" title="쓰기 불가">🔒</span>';
+			var sizeText = fmtSize( e.size ) + ( e.size_approx ? '+' : '' );
 
 			return '<tr>' +
 				'<td class="sfm-col-name"><span class="sfm-name"><span class="sfm-icon">' + icon + '</span>' + nameCell + ro + '</span></td>' +
-				'<td class="sfm-col-size">' + ( e.type === 'dir' ? '—' : fmtSize( e.size ) ) + '</td>' +
+				'<td class="sfm-col-size">' + sizeText + '</td>' +
 				'<td class="sfm-col-modified">' + fmtTime( e.modified ) + '</td>' +
 				'<td class="sfm-col-perms"><span class="sfm-perms">' + esc( e.perms ) + '</span></td>' +
 				'<td class="sfm-col-act"><span class="sfm-row-act">' + acts.join( '' ) + '</span></td>' +
@@ -114,6 +116,108 @@
 			}
 		} );
 		el.breadcrumb.innerHTML = html;
+	}
+
+	/* ------------------------------ 왼쪽: 디렉터리 트리 ------------------------------ */
+
+	function createNode( name, rel ) {
+		var node = document.createElement( 'div' );
+		node.className = 'sfm-node';
+		node.dataset.rel = rel;
+		node.innerHTML =
+			'<div class="sfm-node-row">' +
+				'<span class="sfm-toggle"></span>' +
+				'<span class="sfm-node-icon">📁</span>' +
+				'<span class="sfm-node-label"></span>' +
+			'</div>' +
+			'<div class="sfm-children"></div>';
+		node.querySelector( '.sfm-node-label' ).textContent = name;
+		nodeMap[ rel ] = node;
+		return node;
+	}
+
+	function initTree() {
+		nodeMap = {};
+		el.tree.innerHTML = '';
+		var root = createNode( '루트', '' );
+		root.querySelector( '.sfm-node-icon' ).textContent = '🏠';
+		el.tree.appendChild( root );
+	}
+
+	// 노드의 하위 폴더를 (다시) 불러와 트리에 채운다.
+	function loadChildren( rel ) {
+		var node = nodeMap[ rel ];
+		if ( ! node ) { return Promise.resolve(); }
+		return post( 'sfm_list', { path: rel } ).then( function ( res ) {
+			if ( ! res.success ) { return; }
+			var box = node.querySelector( '.sfm-children' );
+			box.innerHTML = '';
+			var dirs = res.data.entries.filter( function ( e ) { return e.type === 'dir'; } );
+			node.classList.toggle( 'leaf', dirs.length === 0 );
+			dirs.forEach( function ( d ) { box.appendChild( createNode( d.name, d.rel ) ); } );
+			node.dataset.loaded = '1';
+		} );
+	}
+
+	// 노드를 펼친다(필요하면 lazy 로드).
+	function ensureExpanded( rel ) {
+		var node = nodeMap[ rel ];
+		if ( ! node ) { return Promise.resolve(); }
+		if ( node.dataset.loaded === '1' ) {
+			node.classList.add( 'expanded' );
+			return Promise.resolve();
+		}
+		return loadChildren( rel ).then( function () { node.classList.add( 'expanded' ); } );
+	}
+
+	function selectNode( rel ) {
+		var prev = el.tree.querySelectorAll( '.sfm-node-row.selected' );
+		Array.prototype.forEach.call( prev, function ( r ) { r.classList.remove( 'selected' ); } );
+		var node = nodeMap[ rel ];
+		if ( node ) {
+			var row = node.querySelector( '.sfm-node-row' );
+			row.classList.add( 'selected' );
+			row.scrollIntoView( { block: 'nearest' } );
+		}
+	}
+
+	// 트리를 현재 경로까지 펼치고 해당 노드를 선택.
+	function revealInTree( path ) {
+		var segs = path ? path.split( '/' ) : [];
+		var prefixes = [ '' ];
+		var acc = '';
+		segs.forEach( function ( s ) { acc = acc ? acc + '/' + s : s; prefixes.push( acc ); } );
+
+		var chain = Promise.resolve();
+		prefixes.forEach( function ( pfx ) { chain = chain.then( function () { return ensureExpanded( pfx ); } ); } );
+		chain.then( function () { selectNode( path ); } );
+	}
+
+	// 트리 노드 하나만 갱신(폴더 생성/삭제/이름변경/업로드 후).
+	function refreshTreeNode( rel ) {
+		var node = nodeMap[ rel ];
+		if ( ! node || node.dataset.loaded !== '1' ) { return; }
+		var wasExpanded = node.classList.contains( 'expanded' );
+		loadChildren( rel ).then( function () {
+			if ( wasExpanded ) { node.classList.add( 'expanded' ); }
+		} );
+	}
+
+	function onTreeClick( e ) {
+		var node = e.target.closest( '.sfm-node' );
+		if ( ! node ) { return; }
+		var rel = node.dataset.rel;
+
+		if ( e.target.closest( '.sfm-toggle' ) ) {
+			if ( node.classList.contains( 'expanded' ) ) {
+				node.classList.remove( 'expanded' );
+			} else {
+				ensureExpanded( rel );
+			}
+			return;
+		}
+		// 라벨/아이콘 클릭 → 오른쪽에 내용 표시(+ reveal 이 펼침/선택 처리).
+		load( rel );
 	}
 
 	/* ------------------------------ 편집기 ------------------------------ */
@@ -165,7 +269,7 @@
 		if ( ! name ) { return; }
 		post( 'sfm_mkdir', { path: cwd, name: name } ).then( function ( res ) {
 			if ( ! res.success ) { msg( res.data.msg, true ); return; }
-			msg( '폴더를 만들었습니다.' ); load( cwd );
+			msg( '폴더를 만들었습니다.' ); load( cwd ); refreshTreeNode( cwd );
 		} );
 	}
 
@@ -183,7 +287,7 @@
 		if ( ! name || name === cur ) { return; }
 		post( 'sfm_rename', { path: rel, name: name } ).then( function ( res ) {
 			if ( ! res.success ) { msg( res.data.msg, true ); return; }
-			msg( '이름을 변경했습니다.' ); load( cwd );
+			msg( '이름을 변경했습니다.' ); load( cwd ); refreshTreeNode( cwd );
 		} );
 	}
 
@@ -192,7 +296,7 @@
 		if ( ! confirm( '"' + name + '" ' + label + '을(를) 삭제할까요?\n되돌릴 수 없습니다.' ) ) { return; }
 		post( 'sfm_delete', { path: rel } ).then( function ( res ) {
 			if ( ! res.success ) { msg( res.data.msg, true ); return; }
-			msg( '삭제했습니다.' ); load( cwd );
+			msg( '삭제했습니다.' ); load( cwd ); refreshTreeNode( cwd );
 		} );
 	}
 
@@ -236,6 +340,7 @@
 	}
 
 	function init() {
+		el.tree = $( 'sfm-tree' );
 		el.breadcrumb = $( 'sfm-breadcrumb' );
 		el.list = $( 'sfm-list' );
 		el.msg = $( 'sfm-msg' );
@@ -246,6 +351,7 @@
 		el.editorStatus = $( 'sfm-editor-status' );
 		el.editorSave = $( 'sfm-editor-save' );
 
+		el.tree.addEventListener( 'click', onTreeClick );
 		el.list.addEventListener( 'click', onListClick );
 		el.breadcrumb.addEventListener( 'click', onListClick );
 		el.up.addEventListener( 'click', function () {
@@ -253,7 +359,11 @@
 			var idx = cwd.lastIndexOf( '/' );
 			load( idx === -1 ? '' : cwd.substring( 0, idx ) );
 		} );
-		$( 'sfm-refresh' ).addEventListener( 'click', function () { load( cwd ); } );
+		$( 'sfm-refresh' ).addEventListener( 'click', function () { load( cwd ); refreshTreeNode( cwd ); } );
+		$( 'sfm-download-folder' ).addEventListener( 'click', function () {
+			msg( '현재 폴더를 압축하는 중… 크기가 크면 시간이 걸립니다.', false );
+			download( cwd );
+		} );
 		$( 'sfm-new-folder' ).addEventListener( 'click', newFolder );
 		$( 'sfm-new-file' ).addEventListener( 'click', newFile );
 		$( 'sfm-upload' ).addEventListener( 'change', function ( e ) { uploadFiles( e.target.files ); e.target.value = ''; } );
@@ -275,6 +385,7 @@
 			} );
 		} );
 
+		initTree();
 		load( '' );
 	}
 

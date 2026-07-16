@@ -1,6 +1,6 @@
 <?php
 /**
- * 파일 관리자 관리자 화면.
+ * 파일 관리자 관리자 화면 — 파일질라식 2단(좌: 디렉터리 트리 / 우: 폴더 내용).
  *
  * @package safe-file-manager
  */
@@ -24,36 +24,45 @@ $sfm_auto_on = (bool) get_option( 'sfm_auto_update' );
 		이 폴더 밖으로는 접근할 수 없습니다.
 	</p>
 
-	<div class="sfm-toolbar">
-		<div class="sfm-breadcrumb" id="sfm-breadcrumb"></div>
-		<div class="sfm-actions">
-			<button class="button" id="sfm-up" title="상위 폴더">⬆ 상위</button>
-			<button class="button" id="sfm-refresh" title="새로고침">↻ 새로고침</button>
-			<button class="button" id="sfm-new-folder">＋ 새 폴더</button>
-			<button class="button" id="sfm-new-file">＋ 새 파일</button>
-			<label class="button sfm-upload-btn">
-				⬆ 업로드
-				<input type="file" id="sfm-upload" multiple hidden>
-			</label>
-		</div>
-	</div>
-
 	<div class="sfm-msg" id="sfm-msg" hidden></div>
 
-	<table class="widefat striped sfm-table">
-		<thead>
-			<tr>
-				<th class="sfm-col-name">이름</th>
-				<th class="sfm-col-size">크기</th>
-				<th class="sfm-col-modified">수정일</th>
-				<th class="sfm-col-perms">권한</th>
-				<th class="sfm-col-act">작업</th>
-			</tr>
-		</thead>
-		<tbody id="sfm-list">
-			<tr><td colspan="5" class="sfm-loading">불러오는 중…</td></tr>
-		</tbody>
-	</table>
+	<div class="sfm-body">
+		<!-- 왼쪽: 디렉터리 트리 -->
+		<div class="sfm-tree" id="sfm-tree"></div>
+
+		<!-- 오른쪽: 현재 폴더 내용 -->
+		<div class="sfm-main">
+			<div class="sfm-toolbar">
+				<div class="sfm-breadcrumb" id="sfm-breadcrumb"></div>
+				<div class="sfm-actions">
+					<button class="button" id="sfm-up" title="상위 폴더">⬆ 상위</button>
+					<button class="button" id="sfm-refresh" title="새로고침">↻</button>
+					<button class="button" id="sfm-download-folder" title="현재 폴더를 zip으로 다운로드">⬇ 폴더</button>
+					<button class="button" id="sfm-new-folder">＋ 폴더</button>
+					<button class="button" id="sfm-new-file">＋ 파일</button>
+					<label class="button sfm-upload-btn">
+						⬆ 업로드
+						<input type="file" id="sfm-upload" multiple hidden>
+					</label>
+				</div>
+			</div>
+
+			<table class="widefat striped sfm-table">
+				<thead>
+					<tr>
+						<th class="sfm-col-name">이름</th>
+						<th class="sfm-col-size">크기</th>
+						<th class="sfm-col-modified">수정일</th>
+						<th class="sfm-col-perms">권한</th>
+						<th class="sfm-col-act">작업</th>
+					</tr>
+				</thead>
+				<tbody id="sfm-list">
+					<tr><td colspan="5" class="sfm-loading">불러오는 중…</td></tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
 
 	<p class="sfm-autoupdate">
 		<label>

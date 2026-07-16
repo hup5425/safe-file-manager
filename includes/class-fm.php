@@ -124,21 +124,35 @@ class SFM_FM {
 		if ( false === $dh ) {
 			return new WP_Error( 'sfm_open', '폴더를 열 수 없습니다(권한 확인).' );
 		}
+		// 폴더 용량 계산용 전체 예산(stat 호출 상한). 목록 전체가 공유해 대용량 트리에서도 응답이 폭주하지 않게 한다.
+		$budget = 60000;
 		while ( false !== ( $name = readdir( $dh ) ) ) {
 			if ( '.' === $name || '..' === $name ) {
 				continue;
 			}
 			$full   = $abs . '/' . $name;
 			$is_dir = is_dir( $full );
+
+			$size   = 0;
+			$approx = false;
+			if ( $is_dir ) {
+				$trunc = false;
+				$size  = self::dir_size( $full, $budget, $trunc );
+				$approx = $trunc; // 예산 초과로 일부만 합산 → 근사치(+) 표시.
+			} else {
+				$size = (int) @filesize( $full );
+			}
+
 			$entries[] = array(
-				'name'     => $name,
-				'rel'      => self::to_rel( $full ),
-				'type'     => $is_dir ? 'dir' : 'file',
-				'size'     => $is_dir ? 0 : (int) @filesize( $full ),
-				'modified' => (int) @filemtime( $full ),
-				'perms'    => substr( sprintf( '%o', @fileperms( $full ) ), -4 ),
-				'writable' => is_writable( $full ),
-				'editable' => ! $is_dir && (int) @filesize( $full ) <= self::MAX_EDIT_BYTES && self::looks_text( $full ),
+				'name'        => $name,
+				'rel'         => self::to_rel( $full ),
+				'type'        => $is_dir ? 'dir' : 'file',
+				'size'        => $size,
+				'size_approx' => $approx,
+				'modified'    => (int) @filemtime( $full ),
+				'perms'       => substr( sprintf( '%o', @fileperms( $full ) ), -4 ),
+				'writable'    => is_writable( $full ),
+				'editable'    => ! $is_dir && (int) @filesize( $full ) <= self::MAX_EDIT_BYTES && self::looks_text( $full ),
 			);
 		}
 		closedir( $dh );
@@ -335,7 +349,105 @@ class SFM_FM {
 		return $abs;
 	}
 
+	/**
+	 * 폴더를 zip 으로 압축(임시 파일). 다운로드용.
+	 *
+	 * @param string $rel base 기준 상대경로.
+	 * @return array|WP_Error { path(임시 zip 절대경로), name(다운로드 파일명) }.
+	 */
+	public static function zip_dir( $rel ) {
+		$abs = self::resolve( $rel, true );
+		if ( is_wp_error( $abs ) ) {
+			return $abs;
+		}
+		if ( ! is_dir( $abs ) ) {
+			return new WP_Error( 'sfm_notdir', '폴더가 아닙니다.' );
+		}
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			return new WP_Error( 'sfm_zip', '이 서버에는 ZipArchive 확장이 없어 폴더 다운로드를 지원하지 않습니다.' );
+		}
+
+		// 임시 zip 은 쓰기 가능한 업로드 폴더 우선(일부 호스팅의 시스템 temp 는 쓰기 불가).
+		$dir    = '';
+		$upload = wp_upload_dir( null, false );
+		if ( empty( $upload['error'] ) && ! empty( $upload['basedir'] ) && wp_is_writable( $upload['basedir'] ) ) {
+			$dir = trailingslashit( $upload['basedir'] );
+		}
+		$tmp = wp_tempnam( 'sfm-download.zip', $dir );
+		if ( ! $tmp ) {
+			return new WP_Error( 'sfm_zip', '임시 파일 생성 실패(임시폴더 권한 확인).' );
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $tmp, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
+			@unlink( $tmp );
+			return new WP_Error( 'sfm_zip', 'zip 파일을 만들 수 없습니다.' );
+		}
+
+		$root = basename( untrailingslashit( $abs ) );
+		if ( '' === $root ) {
+			$root = 'download';
+		}
+		$len = strlen( $abs ) + 1;
+
+		$it = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $abs, FilesystemIterator::SKIP_DOTS ),
+			RecursiveIteratorIterator::SELF_FIRST
+		);
+		foreach ( $it as $item ) {
+			$path = $item->getPathname();
+			if ( is_link( $path ) ) {
+				continue; // 심볼릭 링크는 건너뜀(경계 밖 유출 방지).
+			}
+			$local = $root . '/' . str_replace( '\\', '/', substr( $path, $len ) );
+			if ( $item->isDir() ) {
+				$zip->addEmptyDir( $local );
+			} else {
+				$zip->addFile( $path, $local );
+			}
+		}
+		$zip->close();
+
+		return array( 'path' => $tmp, 'name' => $root . '.zip' );
+	}
+
 	/* ------------------------------ 내부 헬퍼 ------------------------------ */
+
+	/**
+	 * 폴더 재귀 용량. $budget(전체 stat 예산)을 소진하면 중단하고 $truncated=true.
+	 *
+	 * @param string $dir
+	 * @param int    $budget    남은 예산(참조로 감소).
+	 * @param bool   $truncated 예산 초과 여부(참조로 설정).
+	 * @return int 바이트.
+	 */
+	protected static function dir_size( $dir, &$budget, &$truncated ) {
+		$total = 0;
+		$items = @scandir( $dir );
+		if ( false === $items ) {
+			return $total;
+		}
+		foreach ( $items as $it ) {
+			if ( '.' === $it || '..' === $it ) {
+				continue;
+			}
+			if ( $budget <= 0 ) {
+				$truncated = true;
+				return $total;
+			}
+			$budget--;
+			$path = $dir . '/' . $it;
+			if ( is_link( $path ) ) {
+				continue; // 링크는 용량 합산 제외(무한 순환·경계 밖 방지).
+			}
+			if ( is_dir( $path ) ) {
+				$total += self::dir_size( $path, $budget, $truncated );
+			} else {
+				$total += (int) @filesize( $path );
+			}
+		}
+		return $total;
+	}
 
 	/** 파일/폴더명 검증: 경로 구분자·상위참조·널바이트 금지. */
 	protected static function sanitize_name( $name ) {
