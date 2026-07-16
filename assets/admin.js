@@ -5,8 +5,8 @@
 	var cwd = '';        // 현재 폴더(base 기준 상대경로)
 	var el = {};
 	var nodeMap = {};    // rel -> 트리 노드 element
-	var hist = [];       // 방문 경로 히스토리(앞으로/뒤로)
-	var histIdx = -1;    // 현재 히스토리 위치
+	var histStack = [];  // 방문 경로 히스토리(앞으로/뒤로)
+	var histPos = -1;    // 현재 히스토리 위치
 
 	function $( id ) { return document.getElementById( id ); }
 
@@ -52,46 +52,60 @@
 	/* ------------------------------ 오른쪽: 폴더 내용 ------------------------------ */
 
 	function load( path ) {
-		// 깜빡임 방지: 기존 표 내용을 지우지 않고, 로딩 중엔 살짝 흐리게만 표시했다가 한 번에 교체.
+		// 깜빡임 방지:
+		//  - 기존 표 내용을 지우지 않고 새 내용이 오면 한 번에 교체.
+		//  - 로딩 표시[흐리게]는 180ms 넘게 걸릴 때만 — 로컬 목록은 대개 즉시라 흐려짐 자체가 안 보임.
 		var tbl = el.list.closest( 'table' );
-		if ( tbl ) { tbl.classList.add( 'sfm-busy' ); }
-		post( 'sfm_list', { path: path || '' } ).then( function ( res ) {
+		var busyTimer = tbl ? setTimeout( function () { tbl.classList.add( 'sfm-busy' ); }, 180 ) : null;
+		function done() {
+			if ( busyTimer ) { clearTimeout( busyTimer ); }
 			if ( tbl ) { tbl.classList.remove( 'sfm-busy' ); }
+		}
+		post( 'sfm_list', { path: path || '' } ).then( function ( res ) {
+			done();
 			if ( ! res.success ) { msg( res.data.msg || '오류', true ); return; }
 			cwd = res.data.path;
 			render( res.data );
 			revealInTree( cwd );
 		} ).catch( function () {
-			if ( tbl ) { tbl.classList.remove( 'sfm-busy' ); }
+			done();
 			msg( '네트워크 오류', true );
 		} );
 	}
 
 	/* ------------------------------ 앞으로/뒤로 히스토리 ------------------------------ */
 
-	// 사용자가 새 위치로 이동 — 히스토리에 기록하고 로드.
+	// 사용자가 새 위치로 이동 — 우리 스택 + 브라우저 히스토리(pushState)에 기록.
+	// 브라우저 히스토리에 넣어야 마우스 뒤로가기 버튼·백스페이스가 popstate 로 들어와
+	// 플러그인 화면을 벗어나지 않고 폴더 뒤로가기가 된다.
 	function navigate( path ) {
 		path = path || '';
-		if ( hist[ histIdx ] !== path ) {
-			hist = hist.slice( 0, histIdx + 1 ); // 뒤로 간 상태에서 새로 이동하면 앞쪽 기록 폐기.
-			hist.push( path );
-			histIdx = hist.length - 1;
-		}
+		if ( histStack[ histPos ] === path ) { return; } // 같은 위치 → 재로딩·중복 기록 방지(깜빡임 방지).
+		histStack = histStack.slice( 0, histPos + 1 );    // 뒤로 간 상태에서 새로 이동하면 앞쪽 기록 폐기.
+		histStack.push( path );
+		histPos = histStack.length - 1;
+		history.pushState( { sfmPos: histPos }, '', location.href );
 		load( path );
 		updateNav();
 	}
 
-	function goBack() {
-		if ( histIdx > 0 ) { histIdx--; load( hist[ histIdx ] ); updateNav(); }
+	// 브라우저 뒤로/앞으로(버튼·마우스 사이드버튼·백스페이스) → popstate 로 수렴.
+	function onPopState( e ) {
+		var st = e.state;
+		if ( st && typeof st.sfmPos === 'number' && histStack[ st.sfmPos ] !== undefined ) {
+			histPos = st.sfmPos;
+			load( histStack[ histPos ] );
+			updateNav();
+		}
+		// 우리 상태가 아니면(루트보다 더 뒤) 브라우저 기본 동작 = 페이지 벗어남.
 	}
 
-	function goForward() {
-		if ( histIdx < hist.length - 1 ) { histIdx++; load( hist[ histIdx ] ); updateNav(); }
-	}
+	function goBack() { history.back(); }
+	function goForward() { history.forward(); }
 
 	function updateNav() {
-		if ( el.back ) { el.back.disabled = ( histIdx <= 0 ); }
-		if ( el.fwd ) { el.fwd.disabled = ( histIdx >= hist.length - 1 ); }
+		if ( el.back ) { el.back.disabled = ( histPos <= 0 ); }
+		if ( el.fwd ) { el.fwd.disabled = ( histPos >= histStack.length - 1 ); }
 	}
 
 	function render( data ) {
@@ -117,7 +131,7 @@
 			acts.push( '<a class="button-link" data-rename="' + esc( e.rel ) + '" data-name="' + esc( e.name ) + '">이름변경</a>' );
 			acts.push( '<a class="button-link sfm-del" data-delete="' + esc( e.rel ) + '" data-name="' + esc( e.name ) + '" data-type="' + e.type + '">삭제</a>' );
 
-			var ro = e.writable ? '' : ' <span class="sfm-ro" title="쓰기 불가(서버 파일 권한)">🔒</span>';
+			var ro = e.writable ? '' : ' <span class="sfm-ro" title="쓰기 불가">🔒</span>';
 			var sizeText = fmtSize( e.size ) + ( e.size_approx ? '+' : '' );
 
 			return '<tr data-rel="' + esc( e.rel ) + '" data-type="' + e.type + '" data-editable="' + ( e.editable ? '1' : '0' ) + '" data-name="' + esc( e.name ) + '">' +
@@ -578,8 +592,26 @@
 
 		$( 'sfm-update-btn' ).addEventListener( 'click', onUpdateBtn );
 
+		// 브라우저 뒤로/앞으로(마우스 사이드버튼 포함) 연동.
+		window.addEventListener( 'popstate', onPopState );
+		// 백스페이스 = 뒤로(입력창·편집창에서는 제외).
+		document.addEventListener( 'keydown', function ( e ) {
+			if ( e.key !== 'Backspace' ) { return; }
+			var t = e.target;
+			var tag = t && t.tagName ? t.tagName.toLowerCase() : '';
+			if ( tag === 'input' || tag === 'textarea' || ( t && t.isContentEditable ) ) { return; }
+			if ( el.editorModal && ! el.editorModal.hidden ) { return; }
+			e.preventDefault();
+			goBack();
+		} );
+
 		initTree();
-		navigate( '' );
+		// 초기 위치를 히스토리 첫 항목으로 심는다(replaceState — 새 항목 추가 아님).
+		histStack = [ '' ];
+		histPos = 0;
+		history.replaceState( { sfmPos: 0 }, '', location.href );
+		load( '' );
+		updateNav();
 	}
 
 	if ( document.readyState === 'loading' ) {

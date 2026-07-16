@@ -45,11 +45,13 @@
 	background: #fff; border-bottom: 1px solid #dcdcde;
 	padding: 10px 12px; position: sticky; top: 0; z-index: 1;
 }
-.sfm-breadcrumb { flex: 1 1 320px; font-size: 14px; min-width: 220px; }
+.sfm-breadcrumb { flex: 0 1 auto; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sfm-navbtns { display: flex; gap: 4px; flex: 0 0 auto; }
+.sfm-navbtns .button { padding: 0 8px; }
 .sfm-breadcrumb a { text-decoration: none; cursor: pointer; }
 .sfm-breadcrumb .sfm-crumb-sep { color: #c3c4c7; margin: 0 4px; }
 .sfm-breadcrumb .sfm-crumb-current { color: #1d2327; font-weight: 600; }
-.sfm-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.sfm-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .sfm-upload-btn { cursor: pointer; }
 
 .sfm-msg { padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; }
@@ -78,10 +80,11 @@
 .sfm-col-act { text-align: right; }
 .sfm-row-act { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 
-/* 행 선택/호버 (한 번 클릭=선택, 더블클릭=열기) */
+/* 행 선택/호버 (한 번 클릭=선택, 더블클릭=열기)
+   같은 특이도(0,1,2)로 두고 '선택' 규칙을 뒤에 둬서, 선택된 행은 호버 중에도 진한 색이 우선. */
 .sfm-table tbody tr[data-rel] { cursor: default; }
-.sfm-table tbody tr[data-rel]:hover > td { background: #f0f6fc; }
-.sfm-table tbody tr.sfm-row-selected > td { background: #dbeafe; }
+.sfm-table tbody tr:hover > td { background: #eaf3fc; }              /* 호버: 연한 파랑 */
+.sfm-table tbody tr.sfm-row-selected > td { background: #bcd7f5; }   /* 선택: 항상 진하게(호버 무관) */
 
 /* 우클릭 컨텍스트 메뉴 */
 .sfm-ctxmenu {
