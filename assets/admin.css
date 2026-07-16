@@ -99,6 +99,21 @@
 }
 .sfm-ctx-item:hover { background: #f0f0f1; }
 .sfm-ctx-danger { color: #b32d2e; }
+.sfm-ctx-sep { height: 1px; margin: 4px 6px; background: #e0e0e0; }
+
+/* 다중선택 시 텍스트 드래그 하이라이트 방지(탐색기식). */
+.sfm-table tbody { user-select: none; -webkit-user-select: none; }
+
+/* 속성 모달 */
+.sfm-props-modal-box { width: min(420px, 92vw); }
+.sfm-props-body { padding: 16px 18px; }
+.sfm-props-loading { color: #646970; }
+.sfm-props-title { font-weight: 600; font-size: 14px; margin-bottom: 12px; word-break: break-all; }
+.sfm-props-table { width: 100%; border-collapse: collapse; }
+.sfm-props-table th { text-align: left; color: #646970; font-weight: 400; padding: 6px 0; width: 90px; vertical-align: top; }
+.sfm-props-table td { padding: 6px 0; color: #1d2327; }
+.sfm-props-bytes { color: #8c8f94; font-size: 12px; }
+.sfm-props-note { margin: 10px 0 0; color: #bb5000; font-size: 12px; }
 .sfm-row-act .button-link { color: #2271b1; text-decoration: none; padding: 2px 4px; cursor: pointer; }
 .sfm-row-act .sfm-del { color: #b32d2e; }
 .sfm-perms { font-family: monospace; color: #646970; }
@@ -109,6 +124,8 @@
 	background: #fff; border: 1px solid #dcdcde; border-radius: 6px;
 }
 .sfm-update-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+/* .button 의 display 가 [hidden] 을 덮어써 설치 버튼이 항상 보이는 문제 방지. */
+.sfm-update-row button[hidden] { display: none; }
 .sfm-update-status { color: #646970; font-size: 13px; }
 .sfm-autoupdate-note { margin: 12px 0 0; color: #50575e; font-size: 13px; line-height: 1.6; }
 

@@ -111,6 +111,7 @@
 	function render( data ) {
 		renderBreadcrumb( data.path );
 		el.up.disabled = ( data.parent === null );
+		anchorRel = null; // 폴더가 바뀌면 선택/기준 초기화.
 
 		if ( ! data.entries.length ) {
 			el.list.innerHTML = '<tr><td colspan="5" class="sfm-empty">빈 폴더입니다.</td></tr>';
@@ -163,7 +164,7 @@
 
 	/* ------------------------------ 왼쪽: 디렉터리 트리 ------------------------------ */
 
-	function createNode( name, rel ) {
+	function createNode( name, rel, hasDirs ) {
 		var node = document.createElement( 'div' );
 		node.className = 'sfm-node';
 		node.dataset.rel = rel;
@@ -175,6 +176,11 @@
 			'</div>' +
 			'<div class="sfm-children"></div>';
 		node.querySelector( '.sfm-node-label' ).textContent = name;
+		// 하위 폴더가 없는 폴더는 처음부터 화살표 숨김(leaf). 더 불러올 것도 없으니 loaded 처리.
+		if ( false === hasDirs ) {
+			node.classList.add( 'leaf' );
+			node.dataset.loaded = '1';
+		}
 		nodeMap[ rel ] = node;
 		return node;
 	}
@@ -197,7 +203,7 @@
 			box.innerHTML = '';
 			var dirs = res.data.entries.filter( function ( e ) { return e.type === 'dir'; } );
 			node.classList.toggle( 'leaf', dirs.length === 0 );
-			dirs.forEach( function ( d ) { box.appendChild( createNode( d.name, d.rel ) ); } );
+			dirs.forEach( function ( d ) { box.appendChild( createNode( d.name, d.rel, d.has_dirs ) ); } );
 			node.dataset.loaded = '1';
 		} );
 	}
@@ -388,14 +394,10 @@
 
 	var updLatest = '';
 
-	// 버튼 1개: 평소엔 "확인", 새 버전 감지 후엔 "설치"로 바뀐다.
-	function onUpdateBtn() {
-		var btn = $( 'sfm-update-btn' );
-		if ( btn.dataset.mode === 'install' ) { doUpdate(); } else { checkUpdate(); }
-	}
-
+	// 평소엔 "확인" 버튼만. 확인해서 새 버전이 있으면 그 오른쪽에 "설치" 버튼이 나타난다.
 	function checkUpdate() {
-		var btn = $( 'sfm-update-btn' );
+		var btn = $( 'sfm-check-update' );
+		var inst = $( 'sfm-do-update' );
 		var status = $( 'sfm-update-status' );
 		btn.disabled = true;
 		status.textContent = '확인 중…';
@@ -405,43 +407,58 @@
 			var d = res.data;
 			if ( d.has_update ) {
 				updLatest = d.latest;
-				btn.dataset.mode = 'install';
-				btn.textContent = '⬇ v' + d.latest + ' 업데이트 설치';
+				inst.textContent = '⬇ v' + d.latest + ' 설치';
+				inst.hidden = false;
 				status.textContent = '새 버전 v' + d.latest + ' 있음 (현재 v' + d.current + ')';
 			} else {
-				btn.dataset.mode = 'check';
-				btn.textContent = '🔄 지금 업데이트 확인';
+				inst.hidden = true;
 				status.textContent = '최신 버전입니다 (v' + d.current + ')';
 			}
 		} ).catch( function () { btn.disabled = false; status.textContent = '네트워크 오류'; } );
 	}
 
 	function doUpdate() {
-		var btn = $( 'sfm-update-btn' );
+		var inst = $( 'sfm-do-update' );
 		var status = $( 'sfm-update-status' );
 		if ( ! confirm( 'v' + updLatest + ' 로 업데이트할까요?' ) ) { return; }
-		btn.disabled = true;
+		inst.disabled = true;
 		status.textContent = '업데이트 설치 중… (페이지를 닫지 마세요)';
 		post( 'sfm_do_update', {} ).then( function ( res ) {
 			if ( ! res.success ) {
-				btn.disabled = false;
+				inst.disabled = false;
 				status.textContent = ( res.data && res.data.msg ) || '업데이트 실패';
 				return;
 			}
 			status.textContent = res.data.msg || '업데이트 완료! 새로고침합니다…';
 			setTimeout( function () { location.reload(); }, 1200 );
-		} ).catch( function () { btn.disabled = false; status.textContent = '네트워크 오류'; } );
+		} ).catch( function () { inst.disabled = false; status.textContent = '네트워크 오류'; } );
 	}
 
-	/* ------------------------------ 이벤트: 오른쪽 목록 ------------------------------ */
+	/* ------------------------------ 이벤트: 오른쪽 목록 (선택/다중선택) ------------------------------ */
 
+	var anchorRel = null; // Shift 범위 선택 기준 행.
+
+	function rowsArray() {
+		return Array.prototype.slice.call( el.list.querySelectorAll( 'tr[data-rel]' ) );
+	}
+	function clearSel() {
+		rowsArray().forEach( function ( r ) { r.classList.remove( 'sfm-row-selected' ); } );
+	}
+	function getSelected() {
+		return Array.prototype.slice.call( el.list.querySelectorAll( 'tr.sfm-row-selected' ) );
+	}
+	function indexOfRel( rel ) {
+		var rs = rowsArray();
+		for ( var i = 0; i < rs.length; i++ ) { if ( rs[ i ].getAttribute( 'data-rel' ) === rel ) { return i; } }
+		return -1;
+	}
+	// 단일 선택(다른 선택 해제).
 	function selectRow( tr ) {
-		var prev = el.list.querySelectorAll( 'tr.sfm-row-selected' );
-		Array.prototype.forEach.call( prev, function ( r ) { r.classList.remove( 'sfm-row-selected' ); } );
-		if ( tr ) { tr.classList.add( 'sfm-row-selected' ); }
+		clearSel();
+		if ( tr ) { tr.classList.add( 'sfm-row-selected' ); anchorRel = tr.getAttribute( 'data-rel' ); }
 	}
 
-	// 행의 기본 동작(더블클릭/메뉴 열기): 폴더=진입, 편집가능 파일=편집, 그 외=다운로드.
+	// 행의 기본 동작(더블클릭): 폴더=진입, 편집가능 파일=편집, 그 외=다운로드.
 	function openRow( tr ) {
 		var rel = tr.getAttribute( 'data-rel' );
 		var type = tr.getAttribute( 'data-type' );
@@ -461,9 +478,25 @@
 	function onListClick( e ) {
 		var act = e.target.closest( '[data-edit],[data-download],[data-rename],[data-delete]' );
 		if ( act ) { e.preventDefault(); handleAction( act ); return; }
-		// 여백 포함 행 어디든 한 번 클릭 → 선택.
 		var tr = e.target.closest( 'tr[data-rel]' );
-		if ( tr ) { selectRow( tr ); }
+		if ( ! tr ) { return; }
+		var rel = tr.getAttribute( 'data-rel' );
+
+		if ( e.shiftKey && anchorRel !== null ) {
+			// Shift: 기준 행부터 현재 행까지 범위 선택.
+			var rs = rowsArray();
+			var a = indexOfRel( anchorRel );
+			var b = indexOfRel( rel );
+			if ( a === -1 ) { a = b; }
+			clearSel();
+			for ( var i = Math.min( a, b ); i <= Math.max( a, b ); i++ ) { rs[ i ].classList.add( 'sfm-row-selected' ); }
+		} else if ( e.ctrlKey || e.metaKey ) {
+			// Ctrl/Cmd: 개별 토글.
+			tr.classList.toggle( 'sfm-row-selected' );
+			anchorRel = rel;
+		} else {
+			selectRow( tr );
+		}
 	}
 
 	function onListDblClick( e ) {
@@ -476,32 +509,55 @@
 		var tr = e.target.closest( 'tr[data-rel]' );
 		if ( ! tr ) { return; }
 		e.preventDefault();
-		selectRow( tr );
-		showCtxMenu( e.clientX, e.clientY, tr );
+		// 우클릭한 행이 이미 다중선택에 포함돼 있으면 선택 유지, 아니면 그 행만 단일 선택.
+		if ( ! tr.classList.contains( 'sfm-row-selected' ) ) { selectRow( tr ); }
+		showListMenu( e.clientX, e.clientY );
 	}
 
-	/* ------------------------------ 우클릭 컨텍스트 메뉴 ------------------------------ */
-
-	function showCtxMenu( x, y, tr ) {
-		var type = tr.getAttribute( 'data-type' );
-		var rel = tr.getAttribute( 'data-rel' );
-		var name = tr.getAttribute( 'data-name' );
-		var editable = '1' === tr.getAttribute( 'data-editable' );
-
+	// 오른쪽 목록의 선택 상태로 메뉴 구성.
+	function showListMenu( x, y ) {
+		var sel = getSelected();
+		if ( ! sel.length ) { return; }
 		var items = [];
-		if ( 'dir' === type ) {
-			items.push( { label: '📂 열기', act: function () { navigate( rel ); } } );
-			items.push( { label: '⬇ 다운로드(zip)', act: function () { download( rel ); } } );
-		} else {
-			if ( editable ) { items.push( { label: '✏ 편집', act: function () { openEditor( rel ); } } ); }
-			items.push( { label: '⬇ 다운로드', act: function () { download( rel ); } } );
-		}
-		items.push( { label: '🔤 이름 변경', act: function () { renameEntry( rel, name ); } } );
-		items.push( { label: '🗑 삭제', act: function () { deleteEntry( rel, name, type ); }, danger: true } );
 
+		if ( 1 === sel.length ) {
+			var tr = sel[ 0 ];
+			var type = tr.getAttribute( 'data-type' );
+			var rel = tr.getAttribute( 'data-rel' );
+			var name = tr.getAttribute( 'data-name' );
+			var editable = '1' === tr.getAttribute( 'data-editable' );
+			if ( 'dir' === type ) {
+				items.push( { label: '📂 열기', act: function () { navigate( rel ); } } );
+				items.push( { label: '⬇ 다운로드(zip)', act: function () { download( rel ); } } );
+			} else {
+				if ( editable ) { items.push( { label: '✏ 편집', act: function () { openEditor( rel ); } } ); }
+				items.push( { label: '⬇ 다운로드', act: function () { download( rel ); } } );
+			}
+			items.push( { label: '🔤 이름 변경', act: function () { renameEntry( rel, name ); } } );
+			items.push( { label: '🗑 삭제', act: function () { deleteEntry( rel, name, type ); }, danger: true } );
+			items.push( { sep: true } );
+			items.push( { label: 'ⓘ 속성', act: function () { showProperties( [ rel ] ); } } );
+		} else {
+			var rels = sel.map( function ( t ) { return t.getAttribute( 'data-rel' ); } );
+			items.push( { label: '🗑 삭제 (' + rels.length + '개)', act: function () { deleteMany( rels ); }, danger: true } );
+			items.push( { sep: true } );
+			items.push( { label: 'ⓘ 속성 (' + rels.length + '개)', act: function () { showProperties( rels ); } } );
+		}
+		renderCtxMenu( items, x, y );
+	}
+
+	/* ------------------------------ 공용 컨텍스트 메뉴 렌더러 ------------------------------ */
+
+	function renderCtxMenu( items, x, y ) {
 		var menu = el.ctxmenu;
 		menu.innerHTML = '';
 		items.forEach( function ( it ) {
+			if ( it.sep ) {
+				var hr = document.createElement( 'div' );
+				hr.className = 'sfm-ctx-sep';
+				menu.appendChild( hr );
+				return;
+			}
 			var b = document.createElement( 'button' );
 			b.type = 'button';
 			b.className = 'sfm-ctx-item' + ( it.danger ? ' sfm-ctx-danger' : '' );
@@ -513,14 +569,86 @@
 		menu.hidden = false;
 		// 화면 밖으로 넘어가지 않게 위치 보정.
 		var mw = menu.offsetWidth, mh = menu.offsetHeight;
-		var px = Math.min( x, window.innerWidth - mw - 6 );
-		var py = Math.min( y, window.innerHeight - mh - 6 );
-		menu.style.left = Math.max( 6, px ) + 'px';
-		menu.style.top = Math.max( 6, py ) + 'px';
+		menu.style.left = Math.max( 6, Math.min( x, window.innerWidth - mw - 6 ) ) + 'px';
+		menu.style.top = Math.max( 6, Math.min( y, window.innerHeight - mh - 6 ) ) + 'px';
 	}
 
 	function hideCtxMenu() {
 		if ( el.ctxmenu ) { el.ctxmenu.hidden = true; }
+	}
+
+	/* ------------------------------ 왼쪽 트리 우클릭 메뉴 ------------------------------ */
+
+	function onTreeContext( e ) {
+		var node = e.target.closest( '.sfm-node' );
+		if ( ! node ) { return; }
+		e.preventDefault();
+		var rel = node.dataset.rel;
+		var name = node.querySelector( '.sfm-node-label' ).textContent;
+		selectNode( rel );
+
+		var items = [];
+		items.push( { label: '📂 열기', act: function () { navigate( rel ); } } );
+		items.push( { label: '⬇ 다운로드(zip)', act: function () { download( rel ); } } );
+		if ( '' !== rel ) { // 루트는 이름 변경·삭제 불가.
+			items.push( { label: '🔤 이름 변경', act: function () { renameEntry( rel, name ); } } );
+			items.push( { label: '🗑 삭제', act: function () { deleteEntry( rel, name, 'dir' ); }, danger: true } );
+		}
+		items.push( { sep: true } );
+		items.push( { label: 'ⓘ 속성', act: function () { showProperties( [ rel ] ); } } );
+		renderCtxMenu( items, e.clientX, e.clientY );
+	}
+
+	/* ------------------------------ 여러 항목 삭제 / 속성 ------------------------------ */
+
+	function deleteMany( rels ) {
+		if ( ! confirm( rels.length + '개 항목을 삭제할까요?\n되돌릴 수 없습니다.' ) ) { return; }
+		var i = 0, fail = 0;
+		( function next() {
+			if ( i >= rels.length ) {
+				msg( '삭제 완료: ' + ( rels.length - fail ) + '개' + ( fail ? ', 실패 ' + fail + '개' : '' ), fail > 0 );
+				load( cwd ); refreshTreeNode( cwd );
+				return;
+			}
+			post( 'sfm_delete', { path: rels[ i++ ] } ).then( function ( res ) {
+				if ( ! res.success ) { fail++; }
+				next();
+			} ).catch( function () { fail++; next(); } );
+		} )();
+	}
+
+	function showProperties( rels ) {
+		el.propsBody.innerHTML = '<p class="sfm-props-loading">계산 중…</p>';
+		el.propsModal.hidden = false;
+
+		var body = new FormData();
+		body.append( 'action', 'sfm_stat' );
+		body.append( 'nonce', SFM.nonce );
+		rels.forEach( function ( r ) { body.append( 'paths[]', r ); } );
+
+		fetch( SFM.ajax, { method: 'POST', credentials: 'same-origin', body: body } )
+			.then( function ( r ) { return r.json(); } )
+			.then( function ( res ) {
+				if ( ! res.success ) { el.propsBody.innerHTML = '<p class="sfm-props-loading">' + esc( ( res.data && res.data.msg ) || '오류' ) + '</p>'; return; }
+				var d = res.data;
+				var title = ( 1 === rels.length ) ? esc( baseName( rels[ 0 ] ) ) : ( rels.length + '개 항목' );
+				var sizeText = fmtSize( d.bytes ) + ( d.approx ? ' 이상' : '' );
+				el.propsBody.innerHTML =
+					'<div class="sfm-props-title">' + title + '</div>' +
+					'<table class="sfm-props-table">' +
+						'<tr><th>폴더</th><td>' + d.folders.toLocaleString() + '개</td></tr>' +
+						'<tr><th>파일</th><td>' + d.files.toLocaleString() + '개</td></tr>' +
+						'<tr><th>총 용량</th><td>' + sizeText + ' <span class="sfm-props-bytes">(' + d.bytes.toLocaleString() + ' 바이트)</span></td></tr>' +
+					'</table>' +
+					( d.approx ? '<p class="sfm-props-note">※ 항목이 매우 많아 일부만 집계한 근사치입니다.</p>' : '' );
+			} )
+			.catch( function () { el.propsBody.innerHTML = '<p class="sfm-props-loading">네트워크 오류</p>'; } );
+	}
+
+	function baseName( rel ) {
+		if ( ! rel ) { return '루트'; }
+		var i = rel.lastIndexOf( '/' );
+		return i === -1 ? rel : rel.substring( i + 1 );
 	}
 
 	/* ------------------------------ 이벤트: 빵부스러기 ------------------------------ */
@@ -541,6 +669,8 @@
 		el.back = $( 'sfm-back' );
 		el.fwd = $( 'sfm-fwd' );
 		el.ctxmenu = $( 'sfm-ctxmenu' );
+		el.propsModal = $( 'sfm-props-modal' );
+		el.propsBody = $( 'sfm-props-body' );
 		el.editorModal = $( 'sfm-editor-modal' );
 		el.editorName = $( 'sfm-editor-name' );
 		el.editorText = $( 'sfm-editor-text' );
@@ -549,10 +679,17 @@
 
 		el.tree.addEventListener( 'click', onTreeClick );
 		el.tree.addEventListener( 'dblclick', onTreeDblClick );
+		el.tree.addEventListener( 'contextmenu', onTreeContext );
 		el.list.addEventListener( 'click', onListClick );
 		el.list.addEventListener( 'dblclick', onListDblClick );
 		el.list.addEventListener( 'contextmenu', onListContext );
 		el.breadcrumb.addEventListener( 'click', onBreadcrumbClick );
+
+		// 속성 모달 닫기.
+		function closeProps() { el.propsModal.hidden = true; }
+		$( 'sfm-props-close' ).addEventListener( 'click', closeProps );
+		$( 'sfm-props-ok' ).addEventListener( 'click', closeProps );
+		el.propsModal.addEventListener( 'click', function ( e ) { if ( e.target === el.propsModal ) { closeProps(); } } );
 
 		el.back.addEventListener( 'click', goBack );
 		el.fwd.addEventListener( 'click', goForward );
@@ -567,7 +704,9 @@
 		document.addEventListener( 'click', function ( e ) {
 			if ( el.ctxmenu && ! el.ctxmenu.hidden && ! e.target.closest( '#sfm-ctxmenu' ) ) { hideCtxMenu(); }
 		} );
-		document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) { hideCtxMenu(); } } );
+		document.addEventListener( 'keydown', function ( e ) {
+			if ( e.key === 'Escape' ) { hideCtxMenu(); if ( ! el.propsModal.hidden ) { el.propsModal.hidden = true; } }
+		} );
 		window.addEventListener( 'resize', hideCtxMenu );
 		el.main = el.list.closest( '.sfm-main' );
 		if ( el.main ) { el.main.addEventListener( 'scroll', hideCtxMenu ); }
@@ -590,7 +729,8 @@
 			}
 		} );
 
-		$( 'sfm-update-btn' ).addEventListener( 'click', onUpdateBtn );
+		$( 'sfm-check-update' ).addEventListener( 'click', checkUpdate );
+		$( 'sfm-do-update' ).addEventListener( 'click', doUpdate );
 
 		// 브라우저 뒤로/앞으로(마우스 사이드버튼 포함) 연동.
 		window.addEventListener( 'popstate', onPopState );

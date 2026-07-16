@@ -133,6 +133,14 @@ class SFM_Ajax {
 		exit;
 	}
 
+	/** 선택 항목 속성(폴더/파일 수·용량) 집계. */
+	public static function properties() {
+		self::guard();
+		$paths = isset( $_POST['paths'] ) ? (array) wp_unslash( $_POST['paths'] ) : array();
+		$paths = array_map( 'strval', $paths );
+		self::respond( SFM_FM::properties( $paths ) );
+	}
+
 	/**
 	 * 지금 업데이트 확인 — 캐시 비우고 강제 재검사 후 결과 반환.
 	 */

@@ -149,6 +149,7 @@ class SFM_FM {
 				'type'        => $is_dir ? 'dir' : 'file',
 				'size'        => $size,
 				'size_approx' => $approx,
+				'has_dirs'    => $is_dir ? self::has_subdir( $full ) : false, // 트리 펼침 화살표 표시 여부.
 				'modified'    => (int) @filemtime( $full ),
 				'perms'       => substr( sprintf( '%o', @fileperms( $full ) ), -4 ),
 				'writable'    => is_writable( $full ),
@@ -411,6 +412,72 @@ class SFM_FM {
 		return array( 'path' => $tmp, 'name' => $root . '.zip' );
 	}
 
+	/**
+	 * 선택 항목들의 속성 집계 — 폴더 수·파일 수·총 용량.
+	 * 선택한 폴더 자신도 폴더 수에 포함하고, 그 안의 모든 하위 폴더/파일을 재귀 집계.
+	 *
+	 * @param array $rels base 기준 상대경로 배열.
+	 * @return array { folders, files, bytes, approx, count }.
+	 */
+	public static function properties( $rels ) {
+		$folders = 0;
+		$files   = 0;
+		$bytes   = 0;
+		$budget  = 200000; // 전체 stat 예산(대용량 트리 보호).
+		$trunc   = false;
+
+		foreach ( (array) $rels as $rel ) {
+			$abs = self::resolve( $rel, true );
+			if ( is_wp_error( $abs ) ) {
+				continue;
+			}
+			if ( is_dir( $abs ) ) {
+				$folders++; // 선택한 폴더 자신.
+				self::count_tree( $abs, $folders, $files, $bytes, $budget, $trunc );
+			} elseif ( is_file( $abs ) ) {
+				$files++;
+				$bytes += (int) @filesize( $abs );
+			}
+		}
+
+		return array(
+			'folders' => $folders,
+			'files'   => $files,
+			'bytes'   => $bytes,
+			'approx'  => $trunc,
+			'count'   => count( (array) $rels ),
+		);
+	}
+
+	/** 폴더 트리를 재귀 순회하며 폴더/파일 수·용량 누적(예산 소진 시 중단). */
+	protected static function count_tree( $dir, &$folders, &$files, &$bytes, &$budget, &$trunc ) {
+		$items = @scandir( $dir );
+		if ( false === $items ) {
+			return;
+		}
+		foreach ( $items as $it ) {
+			if ( '.' === $it || '..' === $it ) {
+				continue;
+			}
+			if ( $budget <= 0 ) {
+				$trunc = true;
+				return;
+			}
+			$budget--;
+			$p = $dir . '/' . $it;
+			if ( is_link( $p ) ) {
+				continue;
+			}
+			if ( is_dir( $p ) ) {
+				$folders++;
+				self::count_tree( $p, $folders, $files, $bytes, $budget, $trunc );
+			} else {
+				$files++;
+				$bytes += (int) @filesize( $p );
+			}
+		}
+	}
+
 	/* ------------------------------ 내부 헬퍼 ------------------------------ */
 
 	/**
@@ -459,6 +526,26 @@ class SFM_FM {
 			return new WP_Error( 'sfm_name', '이름에 / \\ 나 특수문자는 쓸 수 없습니다.' );
 		}
 		return $name;
+	}
+
+	/** 하위 폴더가 하나라도 있으면 true(트리 화살표 표시용). 첫 폴더를 만나면 즉시 반환. */
+	protected static function has_subdir( $dir ) {
+		$dh = @opendir( $dir );
+		if ( false === $dh ) {
+			return false;
+		}
+		$found = false;
+		while ( false !== ( $n = readdir( $dh ) ) ) {
+			if ( '.' === $n || '..' === $n ) {
+				continue;
+			}
+			if ( is_dir( $dir . '/' . $n ) ) {
+				$found = true;
+				break;
+			}
+		}
+		closedir( $dh );
+		return $found;
 	}
 
 	/** 재귀 삭제. */

@@ -69,7 +69,8 @@ $sfm_base = SFM_FM::base_dir();
 
 	<div class="sfm-update-box">
 		<div class="sfm-update-row">
-			<button class="button button-primary" id="sfm-update-btn" data-mode="check">🔄 지금 업데이트 확인</button>
+			<button class="button" id="sfm-check-update">🔄 지금 업데이트 확인</button>
+			<button class="button button-primary" id="sfm-do-update" hidden>⬇ 업데이트 설치</button>
 			<span class="sfm-update-status" id="sfm-update-status">현재 버전 v<?php echo esc_html( SFM_VERSION ); ?></span>
 		</div>
 		<p class="sfm-autoupdate-note">
@@ -81,6 +82,21 @@ $sfm_base = SFM_FM::base_dir();
 
 <!-- 우클릭 컨텍스트 메뉴 -->
 <div class="sfm-ctxmenu" id="sfm-ctxmenu" hidden></div>
+
+<!-- 속성 모달 -->
+<div class="sfm-modal" id="sfm-props-modal" hidden>
+	<div class="sfm-modal-box sfm-props-modal-box">
+		<div class="sfm-modal-head">
+			<strong>속성</strong>
+			<button class="button-link sfm-modal-close" id="sfm-props-close">✕</button>
+		</div>
+		<div class="sfm-props-body" id="sfm-props-body"></div>
+		<div class="sfm-modal-foot">
+			<span class="sfm-spacer"></span>
+			<button class="button button-primary" id="sfm-props-ok">닫기</button>
+		</div>
+	</div>
+</div>
 
 <!-- 편집기 모달 -->
 <div class="sfm-modal" id="sfm-editor-modal" hidden>
