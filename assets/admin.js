@@ -534,13 +534,11 @@
 				items.push( { label: '⬇ 다운로드', act: function () { download( rel ); } } );
 			}
 			items.push( { label: '🔤 이름 변경', act: function () { renameEntry( rel, name ); } } );
-			items.push( { label: '🗑 삭제', act: function () { deleteEntry( rel, name, type ); }, danger: true } );
 			items.push( { sep: true } );
 			items.push( { label: 'ⓘ 속성', act: function () { showProperties( [ rel ] ); } } );
 		} else {
+			// 다중 선택: 실수 삭제 방지를 위해 삭제는 메뉴에서 제외, 속성만.
 			var rels = sel.map( function ( t ) { return t.getAttribute( 'data-rel' ); } );
-			items.push( { label: '🗑 삭제 (' + rels.length + '개)', act: function () { deleteMany( rels ); }, danger: true } );
-			items.push( { sep: true } );
 			items.push( { label: 'ⓘ 속성 (' + rels.length + '개)', act: function () { showProperties( rels ); } } );
 		}
 		renderCtxMenu( items, x, y );
@@ -590,32 +588,15 @@
 		var items = [];
 		items.push( { label: '📂 열기', act: function () { navigate( rel ); } } );
 		items.push( { label: '⬇ 다운로드(zip)', act: function () { download( rel ); } } );
-		if ( '' !== rel ) { // 루트는 이름 변경·삭제 불가.
+		if ( '' !== rel ) { // 루트는 이름 변경 불가.
 			items.push( { label: '🔤 이름 변경', act: function () { renameEntry( rel, name ); } } );
-			items.push( { label: '🗑 삭제', act: function () { deleteEntry( rel, name, 'dir' ); }, danger: true } );
 		}
 		items.push( { sep: true } );
 		items.push( { label: 'ⓘ 속성', act: function () { showProperties( [ rel ] ); } } );
 		renderCtxMenu( items, e.clientX, e.clientY );
 	}
 
-	/* ------------------------------ 여러 항목 삭제 / 속성 ------------------------------ */
-
-	function deleteMany( rels ) {
-		if ( ! confirm( rels.length + '개 항목을 삭제할까요?\n되돌릴 수 없습니다.' ) ) { return; }
-		var i = 0, fail = 0;
-		( function next() {
-			if ( i >= rels.length ) {
-				msg( '삭제 완료: ' + ( rels.length - fail ) + '개' + ( fail ? ', 실패 ' + fail + '개' : '' ), fail > 0 );
-				load( cwd ); refreshTreeNode( cwd );
-				return;
-			}
-			post( 'sfm_delete', { path: rels[ i++ ] } ).then( function ( res ) {
-				if ( ! res.success ) { fail++; }
-				next();
-			} ).catch( function () { fail++; next(); } );
-		} )();
-	}
+	/* ------------------------------ 속성 ------------------------------ */
 
 	function showProperties( rels ) {
 		el.propsBody.innerHTML = '<p class="sfm-props-loading">계산 중…</p>';
