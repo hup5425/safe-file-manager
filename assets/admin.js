@@ -50,13 +50,19 @@
 	/* ------------------------------ 오른쪽: 폴더 내용 ------------------------------ */
 
 	function load( path ) {
-		el.list.innerHTML = '<tr><td colspan="5" class="sfm-loading">불러오는 중…</td></tr>';
+		// 깜빡임 방지: 기존 표 내용을 지우지 않고, 로딩 중엔 살짝 흐리게만 표시했다가 한 번에 교체.
+		var tbl = el.list.closest( 'table' );
+		if ( tbl ) { tbl.classList.add( 'sfm-busy' ); }
 		post( 'sfm_list', { path: path || '' } ).then( function ( res ) {
+			if ( tbl ) { tbl.classList.remove( 'sfm-busy' ); }
 			if ( ! res.success ) { msg( res.data.msg || '오류', true ); return; }
 			cwd = res.data.path;
 			render( res.data );
 			revealInTree( cwd );
-		} ).catch( function () { msg( '네트워크 오류', true ); } );
+		} ).catch( function () {
+			if ( tbl ) { tbl.classList.remove( 'sfm-busy' ); }
+			msg( '네트워크 오류', true );
+		} );
 	}
 
 	function render( data ) {

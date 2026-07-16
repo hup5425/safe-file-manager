@@ -65,6 +65,9 @@
 .sfm-col-perms { width: 80px; }
 .sfm-col-act { width: 220px; }
 .sfm-loading, .sfm-empty { text-align: center; color: #646970; padding: 24px !important; }
+/* 폴더 이동 중: 내용을 지우지 않고 살짝 흐리게만(깜빡임 방지). */
+.sfm-table.sfm-busy tbody { opacity: .5; transition: opacity .12s ease; }
+.sfm-table.sfm-busy { cursor: progress; }
 
 .sfm-name { display: flex; align-items: center; gap: 8px; }
 .sfm-icon { font-size: 16px; line-height: 1; }
