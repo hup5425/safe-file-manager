@@ -34,6 +34,8 @@ $sfm_base = SFM_FM::base_dir();
 			<div class="sfm-toolbar">
 				<div class="sfm-breadcrumb" id="sfm-breadcrumb"></div>
 				<div class="sfm-actions">
+					<button class="button" id="sfm-back" title="뒤로" disabled>◀</button>
+					<button class="button" id="sfm-fwd" title="앞으로" disabled>▶</button>
 					<button class="button" id="sfm-up" title="상위 폴더">⬆ 상위</button>
 					<button class="button" id="sfm-refresh" title="새로고침">↻</button>
 					<button class="button" id="sfm-download-folder" title="현재 폴더를 zip으로 다운로드">⬇ 폴더</button>
@@ -74,6 +76,9 @@ $sfm_base = SFM_FM::base_dir();
 		</p>
 	</div>
 </div>
+
+<!-- 우클릭 컨텍스트 메뉴 -->
+<div class="sfm-ctxmenu" id="sfm-ctxmenu" hidden></div>
 
 <!-- 편집기 모달 -->
 <div class="sfm-modal" id="sfm-editor-modal" hidden>

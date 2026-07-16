@@ -5,6 +5,8 @@
 	var cwd = '';        // 현재 폴더(base 기준 상대경로)
 	var el = {};
 	var nodeMap = {};    // rel -> 트리 노드 element
+	var hist = [];       // 방문 경로 히스토리(앞으로/뒤로)
+	var histIdx = -1;    // 현재 히스토리 위치
 
 	function $( id ) { return document.getElementById( id ); }
 
@@ -65,6 +67,33 @@
 		} );
 	}
 
+	/* ------------------------------ 앞으로/뒤로 히스토리 ------------------------------ */
+
+	// 사용자가 새 위치로 이동 — 히스토리에 기록하고 로드.
+	function navigate( path ) {
+		path = path || '';
+		if ( hist[ histIdx ] !== path ) {
+			hist = hist.slice( 0, histIdx + 1 ); // 뒤로 간 상태에서 새로 이동하면 앞쪽 기록 폐기.
+			hist.push( path );
+			histIdx = hist.length - 1;
+		}
+		load( path );
+		updateNav();
+	}
+
+	function goBack() {
+		if ( histIdx > 0 ) { histIdx--; load( hist[ histIdx ] ); updateNav(); }
+	}
+
+	function goForward() {
+		if ( histIdx < hist.length - 1 ) { histIdx++; load( hist[ histIdx ] ); updateNav(); }
+	}
+
+	function updateNav() {
+		if ( el.back ) { el.back.disabled = ( histIdx <= 0 ); }
+		if ( el.fwd ) { el.fwd.disabled = ( histIdx >= hist.length - 1 ); }
+	}
+
 	function render( data ) {
 		renderBreadcrumb( data.path );
 		el.up.disabled = ( data.parent === null );
@@ -76,14 +105,8 @@
 
 		var rows = data.entries.map( function ( e ) {
 			var icon = e.type === 'dir' ? '📁' : '📄';
-			var nameCell;
-			if ( e.type === 'dir' ) {
-				nameCell = '<a class="sfm-open" data-open-dir="' + esc( e.rel ) + '">' + esc( e.name ) + '</a>';
-			} else if ( e.editable ) {
-				nameCell = '<a class="sfm-open" data-edit="' + esc( e.rel ) + '">' + esc( e.name ) + '</a>';
-			} else {
-				nameCell = '<span class="sfm-file-name">' + esc( e.name ) + '</span>';
-			}
+			// 이름은 클릭 링크가 아니라 텍스트 — 한 번 클릭=선택, 더블클릭=열기(행 전체).
+			var nameCell = '<span class="sfm-file-name">' + esc( e.name ) + '</span>';
 
 			var acts = [];
 			if ( e.type === 'file' && e.editable ) {
@@ -94,10 +117,10 @@
 			acts.push( '<a class="button-link" data-rename="' + esc( e.rel ) + '" data-name="' + esc( e.name ) + '">이름변경</a>' );
 			acts.push( '<a class="button-link sfm-del" data-delete="' + esc( e.rel ) + '" data-name="' + esc( e.name ) + '" data-type="' + e.type + '">삭제</a>' );
 
-			var ro = e.writable ? '' : ' <span class="sfm-ro" title="쓰기 불가">🔒</span>';
+			var ro = e.writable ? '' : ' <span class="sfm-ro" title="쓰기 불가(서버 파일 권한)">🔒</span>';
 			var sizeText = fmtSize( e.size ) + ( e.size_approx ? '+' : '' );
 
-			return '<tr>' +
+			return '<tr data-rel="' + esc( e.rel ) + '" data-type="' + e.type + '" data-editable="' + ( e.editable ? '1' : '0' ) + '" data-name="' + esc( e.name ) + '">' +
 				'<td class="sfm-col-name"><span class="sfm-name"><span class="sfm-icon">' + icon + '</span>' + nameCell + ro + '</span></td>' +
 				'<td class="sfm-col-size">' + sizeText + '</td>' +
 				'<td class="sfm-col-modified">' + fmtTime( e.modified ) + '</td>' +
@@ -190,9 +213,13 @@
 	// 트리를 현재 경로까지 펼치고 해당 노드를 선택.
 	function revealInTree( path ) {
 		var segs = path ? path.split( '/' ) : [];
+		// 상위(조상)들만 펼쳐 대상이 보이게 한다. 대상 노드 자체의 펼침/접힘은 더블클릭이 담당.
 		var prefixes = [ '' ];
 		var acc = '';
-		segs.forEach( function ( s ) { acc = acc ? acc + '/' + s : s; prefixes.push( acc ); } );
+		for ( var i = 0; i < segs.length - 1; i++ ) {
+			acc = acc ? acc + '/' + segs[ i ] : segs[ i ];
+			prefixes.push( acc );
+		}
 
 		var chain = Promise.resolve();
 		prefixes.forEach( function ( pfx ) { chain = chain.then( function () { return ensureExpanded( pfx ); } ); } );
@@ -215,15 +242,26 @@
 		var rel = node.dataset.rel;
 
 		if ( e.target.closest( '.sfm-toggle' ) ) {
-			if ( node.classList.contains( 'expanded' ) ) {
-				node.classList.remove( 'expanded' );
-			} else {
-				ensureExpanded( rel );
-			}
+			toggleNode( node, rel );
 			return;
 		}
-		// 라벨/아이콘 클릭 → 오른쪽에 내용 표시(+ reveal 이 펼침/선택 처리).
-		load( rel );
+		// 라벨/아이콘 클릭 → 선택 + 오른쪽에 내용 표시(히스토리 기록).
+		navigate( rel );
+	}
+
+	// 트리 노드 더블클릭 → 펼침/접힘 토글.
+	function onTreeDblClick( e ) {
+		var node = e.target.closest( '.sfm-node' );
+		if ( ! node ) { return; }
+		toggleNode( node, node.dataset.rel );
+	}
+
+	function toggleNode( node, rel ) {
+		if ( node.classList.contains( 'expanded' ) ) {
+			node.classList.remove( 'expanded' );
+		} else {
+			ensureExpanded( rel );
+		}
 	}
 
 	/* ------------------------------ 편집기 ------------------------------ */
@@ -381,17 +419,103 @@
 		} ).catch( function () { btn.disabled = false; status.textContent = '네트워크 오류'; } );
 	}
 
-	/* ------------------------------ 이벤트 ------------------------------ */
+	/* ------------------------------ 이벤트: 오른쪽 목록 ------------------------------ */
 
-	function onListClick( e ) {
-		var t = e.target.closest( '[data-open-dir],[data-edit],[data-download],[data-rename],[data-delete]' );
-		if ( ! t ) { return; }
-		e.preventDefault();
-		if ( t.hasAttribute( 'data-open-dir' ) ) { load( t.getAttribute( 'data-open-dir' ) ); }
-		else if ( t.hasAttribute( 'data-edit' ) ) { openEditor( t.getAttribute( 'data-edit' ) ); }
+	function selectRow( tr ) {
+		var prev = el.list.querySelectorAll( 'tr.sfm-row-selected' );
+		Array.prototype.forEach.call( prev, function ( r ) { r.classList.remove( 'sfm-row-selected' ); } );
+		if ( tr ) { tr.classList.add( 'sfm-row-selected' ); }
+	}
+
+	// 행의 기본 동작(더블클릭/메뉴 열기): 폴더=진입, 편집가능 파일=편집, 그 외=다운로드.
+	function openRow( tr ) {
+		var rel = tr.getAttribute( 'data-rel' );
+		var type = tr.getAttribute( 'data-type' );
+		if ( 'dir' === type ) { navigate( rel ); }
+		else if ( '1' === tr.getAttribute( 'data-editable' ) ) { openEditor( rel ); }
+		else { download( rel ); }
+	}
+
+	// 작업 버튼(맨 오른쪽 열) 처리.
+	function handleAction( t ) {
+		if ( t.hasAttribute( 'data-edit' ) ) { openEditor( t.getAttribute( 'data-edit' ) ); }
 		else if ( t.hasAttribute( 'data-download' ) ) { download( t.getAttribute( 'data-download' ) ); }
 		else if ( t.hasAttribute( 'data-rename' ) ) { renameEntry( t.getAttribute( 'data-rename' ), t.getAttribute( 'data-name' ) ); }
 		else if ( t.hasAttribute( 'data-delete' ) ) { deleteEntry( t.getAttribute( 'data-delete' ), t.getAttribute( 'data-name' ), t.getAttribute( 'data-type' ) ); }
+	}
+
+	function onListClick( e ) {
+		var act = e.target.closest( '[data-edit],[data-download],[data-rename],[data-delete]' );
+		if ( act ) { e.preventDefault(); handleAction( act ); return; }
+		// 여백 포함 행 어디든 한 번 클릭 → 선택.
+		var tr = e.target.closest( 'tr[data-rel]' );
+		if ( tr ) { selectRow( tr ); }
+	}
+
+	function onListDblClick( e ) {
+		if ( e.target.closest( '[data-edit],[data-download],[data-rename],[data-delete]' ) ) { return; }
+		var tr = e.target.closest( 'tr[data-rel]' );
+		if ( tr ) { selectRow( tr ); openRow( tr ); }
+	}
+
+	function onListContext( e ) {
+		var tr = e.target.closest( 'tr[data-rel]' );
+		if ( ! tr ) { return; }
+		e.preventDefault();
+		selectRow( tr );
+		showCtxMenu( e.clientX, e.clientY, tr );
+	}
+
+	/* ------------------------------ 우클릭 컨텍스트 메뉴 ------------------------------ */
+
+	function showCtxMenu( x, y, tr ) {
+		var type = tr.getAttribute( 'data-type' );
+		var rel = tr.getAttribute( 'data-rel' );
+		var name = tr.getAttribute( 'data-name' );
+		var editable = '1' === tr.getAttribute( 'data-editable' );
+
+		var items = [];
+		if ( 'dir' === type ) {
+			items.push( { label: '📂 열기', act: function () { navigate( rel ); } } );
+			items.push( { label: '⬇ 다운로드(zip)', act: function () { download( rel ); } } );
+		} else {
+			if ( editable ) { items.push( { label: '✏ 편집', act: function () { openEditor( rel ); } } ); }
+			items.push( { label: '⬇ 다운로드', act: function () { download( rel ); } } );
+		}
+		items.push( { label: '🔤 이름 변경', act: function () { renameEntry( rel, name ); } } );
+		items.push( { label: '🗑 삭제', act: function () { deleteEntry( rel, name, type ); }, danger: true } );
+
+		var menu = el.ctxmenu;
+		menu.innerHTML = '';
+		items.forEach( function ( it ) {
+			var b = document.createElement( 'button' );
+			b.type = 'button';
+			b.className = 'sfm-ctx-item' + ( it.danger ? ' sfm-ctx-danger' : '' );
+			b.textContent = it.label;
+			b.addEventListener( 'click', function () { hideCtxMenu(); it.act(); } );
+			menu.appendChild( b );
+		} );
+
+		menu.hidden = false;
+		// 화면 밖으로 넘어가지 않게 위치 보정.
+		var mw = menu.offsetWidth, mh = menu.offsetHeight;
+		var px = Math.min( x, window.innerWidth - mw - 6 );
+		var py = Math.min( y, window.innerHeight - mh - 6 );
+		menu.style.left = Math.max( 6, px ) + 'px';
+		menu.style.top = Math.max( 6, py ) + 'px';
+	}
+
+	function hideCtxMenu() {
+		if ( el.ctxmenu ) { el.ctxmenu.hidden = true; }
+	}
+
+	/* ------------------------------ 이벤트: 빵부스러기 ------------------------------ */
+
+	function onBreadcrumbClick( e ) {
+		var a = e.target.closest( '[data-open-dir]' );
+		if ( ! a ) { return; }
+		e.preventDefault();
+		navigate( a.getAttribute( 'data-open-dir' ) );
 	}
 
 	function init() {
@@ -400,6 +524,9 @@
 		el.list = $( 'sfm-list' );
 		el.msg = $( 'sfm-msg' );
 		el.up = $( 'sfm-up' );
+		el.back = $( 'sfm-back' );
+		el.fwd = $( 'sfm-fwd' );
+		el.ctxmenu = $( 'sfm-ctxmenu' );
 		el.editorModal = $( 'sfm-editor-modal' );
 		el.editorName = $( 'sfm-editor-name' );
 		el.editorText = $( 'sfm-editor-text' );
@@ -407,14 +534,29 @@
 		el.editorSave = $( 'sfm-editor-save' );
 
 		el.tree.addEventListener( 'click', onTreeClick );
+		el.tree.addEventListener( 'dblclick', onTreeDblClick );
 		el.list.addEventListener( 'click', onListClick );
-		el.breadcrumb.addEventListener( 'click', onListClick );
+		el.list.addEventListener( 'dblclick', onListDblClick );
+		el.list.addEventListener( 'contextmenu', onListContext );
+		el.breadcrumb.addEventListener( 'click', onBreadcrumbClick );
+
+		el.back.addEventListener( 'click', goBack );
+		el.fwd.addEventListener( 'click', goForward );
 		el.up.addEventListener( 'click', function () {
 			if ( ! cwd ) { return; }
 			var idx = cwd.lastIndexOf( '/' );
-			load( idx === -1 ? '' : cwd.substring( 0, idx ) );
+			navigate( idx === -1 ? '' : cwd.substring( 0, idx ) );
 		} );
 		$( 'sfm-refresh' ).addEventListener( 'click', function () { load( cwd ); refreshTreeNode( cwd ); } );
+
+		// 컨텍스트 메뉴 닫기(바깥 클릭·Esc·스크롤·리사이즈).
+		document.addEventListener( 'click', function ( e ) {
+			if ( el.ctxmenu && ! el.ctxmenu.hidden && ! e.target.closest( '#sfm-ctxmenu' ) ) { hideCtxMenu(); }
+		} );
+		document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) { hideCtxMenu(); } } );
+		window.addEventListener( 'resize', hideCtxMenu );
+		el.main = el.list.closest( '.sfm-main' );
+		if ( el.main ) { el.main.addEventListener( 'scroll', hideCtxMenu ); }
 		$( 'sfm-download-folder' ).addEventListener( 'click', function () {
 			msg( '현재 폴더를 압축하는 중… 크기가 크면 시간이 걸립니다.', false );
 			download( cwd );
@@ -437,7 +579,7 @@
 		$( 'sfm-update-btn' ).addEventListener( 'click', onUpdateBtn );
 
 		initTree();
-		load( '' );
+		navigate( '' );
 	}
 
 	if ( document.readyState === 'loading' ) {
