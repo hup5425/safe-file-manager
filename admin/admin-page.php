@@ -64,13 +64,20 @@ $sfm_auto_on = (bool) get_option( 'sfm_auto_update' );
 		</div>
 	</div>
 
-	<p class="sfm-autoupdate">
-		<label>
-			<input type="checkbox" id="sfm-autoupdate" <?php checked( $sfm_auto_on ); ?>>
-			새 버전이 올라오면 자동으로 업데이트
-		</label>
-		<span class="sfm-autoupdate-hint">(끄면 플러그인 목록에서 수동으로 업데이트합니다)</span>
-	</p>
+	<div class="sfm-update-box">
+		<div class="sfm-update-row">
+			<button class="button" id="sfm-check-update">🔄 지금 업데이트 확인</button>
+			<button class="button button-primary" id="sfm-do-update" hidden>업데이트 설치</button>
+			<span class="sfm-update-status" id="sfm-update-status">현재 버전 v<?php echo esc_html( SFM_VERSION ); ?></span>
+		</div>
+		<p class="sfm-autoupdate">
+			<label>
+				<input type="checkbox" id="sfm-autoupdate" <?php checked( $sfm_auto_on ); ?>>
+				새 버전이 올라오면 자동으로 업데이트
+			</label>
+			<span class="sfm-autoupdate-hint">(꺼도 위 "지금 업데이트 확인"으로 수동 설치할 수 있습니다)</span>
+		</p>
+	</div>
 </div>
 
 <!-- 편집기 모달 -->

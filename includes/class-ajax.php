@@ -139,4 +139,90 @@ class SFM_Ajax {
 		update_option( 'sfm_auto_update', $on );
 		wp_send_json_success( array( 'on' => $on ) );
 	}
+
+	/**
+	 * 지금 업데이트 확인 — 캐시 비우고 강제 재검사 후 결과 반환.
+	 */
+	public static function check_update() {
+		self::guard();
+
+		// 우리 릴리스 응답 캐시 + WP 업데이트 트랜지언트 비우고 강제 재검사.
+		if ( defined( 'SFM_UPDATE_REPO' ) && SFM_UPDATE_REPO ) {
+			delete_transient( 'sfm_upd_' . md5( SFM_UPDATE_REPO ) );
+		}
+		delete_site_transient( 'update_plugins' );
+		wp_update_plugins();
+
+		$basename = plugin_basename( SFM_FILE );
+		$t        = get_site_transient( 'update_plugins' );
+		$has      = is_object( $t ) && isset( $t->response[ $basename ] );
+
+		$latest = SFM_VERSION;
+		if ( $has ) {
+			$latest = $t->response[ $basename ]->new_version;
+		} elseif ( is_object( $t ) && isset( $t->no_update[ $basename ] ) ) {
+			$latest = $t->no_update[ $basename ]->new_version;
+		}
+
+		wp_send_json_success(
+			array(
+				'current'     => SFM_VERSION,
+				'latest'      => $latest,
+				'has_update'  => $has,
+				'plugins_url' => self_admin_url( 'plugins.php' ),
+			)
+		);
+	}
+
+	/**
+	 * 설정 화면에서 그 자리 업데이트(플러그인 화면 이동 없이).
+	 * WP 의 Plugin_Upgrader 를 ajax 로 실행.
+	 */
+	public static function do_update() {
+		self::guard();
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			wp_send_json_error( array( 'msg' => '업데이트 권한이 없습니다.' ), 403 );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/misc.php';
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+		if ( ! class_exists( 'WP_Ajax_Upgrader_Skin' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/class-wp-ajax-upgrader-skin.php';
+		}
+
+		// 최신 정보 강제 재확인(캐시 비우기) → 업데이트 트랜지언트에 새 버전 주입.
+		if ( defined( 'SFM_UPDATE_REPO' ) && SFM_UPDATE_REPO ) {
+			delete_transient( 'sfm_upd_' . md5( SFM_UPDATE_REPO ) );
+		}
+		delete_site_transient( 'update_plugins' );
+		wp_update_plugins();
+
+		$plugin = plugin_basename( SFM_FILE );
+		// WP 업그레이더는 교체 전 플러그인을 조용히 비활성화하는데, 단일 AJAX 자가
+		// 업데이트에서는 다시 켜주지 않는다 → 업데이트 전 활성 상태를 기억해 뒀다 복구.
+		$was_active = is_plugin_active( $plugin );
+
+		$skin     = new WP_Ajax_Upgrader_Skin();
+		$upgrader = new Plugin_Upgrader( $skin );
+		$result   = $upgrader->upgrade( $plugin );
+
+		if ( $skin->get_errors()->has_errors() ) {
+			wp_send_json_error( array( 'msg' => $skin->get_errors()->get_error_message() ), 500 );
+		}
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'msg' => $result->get_error_message() ), 500 );
+		}
+		if ( false === $result ) {
+			wp_send_json_error( array( 'msg' => '업데이트할 새 버전을 찾지 못했습니다(잠시 후 다시 시도).' ), 500 );
+		}
+
+		// 업데이트 과정에서 비활성화됐다면 원래대로 다시 활성화(조용히).
+		if ( $was_active && ! is_plugin_active( $plugin ) ) {
+			activate_plugin( $plugin, '', false, true );
+		}
+
+		wp_send_json_success( array( 'msg' => '업데이트 완료! 곧 새로고침됩니다.' ) );
+	}
 }

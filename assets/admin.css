@@ -77,7 +77,13 @@
 .sfm-perms { font-family: monospace; color: #646970; }
 .sfm-ro { color: #bb5000; font-size: 11px; }
 
-.sfm-autoupdate { margin-top: 18px; color: #1d2327; }
+.sfm-update-box {
+	margin-top: 18px; padding: 14px 16px;
+	background: #fff; border: 1px solid #dcdcde; border-radius: 6px;
+}
+.sfm-update-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.sfm-update-status { color: #646970; font-size: 13px; }
+.sfm-autoupdate { margin: 12px 0 0; color: #1d2327; }
 .sfm-autoupdate-hint { color: #646970; font-size: 12px; margin-left: 4px; }
 
 /* 모달 */
