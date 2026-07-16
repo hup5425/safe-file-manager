@@ -16,7 +16,7 @@
 	border: 1px solid #dcdcde; border-radius: 6px; overflow: hidden; background: #fff;
 }
 .sfm-tree {
-	width: 300px; min-width: 180px; flex: 0 0 auto;
+	width: 500px; min-width: 180px; flex: 0 0 auto;
 	border-right: 1px solid #dcdcde; background: #f6f7f7;
 	overflow: auto; max-height: 72vh; padding: 8px 4px;
 	resize: horizontal;

@@ -3,7 +3,7 @@ Contributors: you
 Requires at least: 5.0
 Tested up to: 6.6
 Requires PHP: 7.0
-Stable tag: 1.0.4
+Stable tag: 1.0.5
 License: GPLv2 or later
 
 취약한 WP File Manager(elFinder) 대체용 안전 파일 관리자. 워드프레스 관리자 화면에서 서버 파일을 열람·편집·업로드·다운로드합니다.
@@ -32,6 +32,9 @@ License: GPLv2 or later
 * 필터 `sfm_base_dir` — 접근 루트를 특정 폴더로 좁힐 수 있습니다.
 
 == 변경 이력 ==
+
+= 1.0.5 =
+* 왼쪽 디렉터리 트리 기본 가로 폭을 500px로 확대(여전히 드래그로 조절 가능).
 
 = 1.0.4 =
 * 왼쪽 트리에서 폴더를 누를 때 오른쪽 목록이 깜빡이던 문제 개선 — 기존 내용을 지우지 않고 로딩 중엔 살짝 흐리게만 표시했다가 새 내용으로 한 번에 교체.
