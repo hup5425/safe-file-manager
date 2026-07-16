@@ -1,0 +1,74 @@
+/* 안전 파일 관리자 — 관리자 스타일 */
+
+.sfm-title { display: flex; align-items: center; gap: 10px; }
+.sfm-ver { font-size: 13px; color: #646970; font-weight: 400; }
+.sfm-ver-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; text-decoration: none; }
+.sfm-ver-badge--latest { background: #edfaef; color: #1a7f37; }
+.sfm-ver-badge--upd { background: #fcf0e4; color: #bb5000; }
+
+.sfm-root-note { color: #646970; margin: 4px 0 16px; }
+.sfm-root-note code { font-size: 12px; }
+.sfm-sep { margin: 0 6px; color: #c3c4c7; }
+
+.sfm-toolbar {
+	display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+	background: #fff; border: 1px solid #dcdcde; border-radius: 6px;
+	padding: 10px 12px; margin-bottom: 12px;
+}
+.sfm-breadcrumb { flex: 1 1 320px; font-size: 14px; min-width: 220px; }
+.sfm-breadcrumb a { text-decoration: none; cursor: pointer; }
+.sfm-breadcrumb .sfm-crumb-sep { color: #c3c4c7; margin: 0 4px; }
+.sfm-breadcrumb .sfm-crumb-current { color: #1d2327; font-weight: 600; }
+.sfm-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.sfm-upload-btn { cursor: pointer; }
+
+.sfm-msg { padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; }
+.sfm-msg--ok { background: #edfaef; border: 1px solid #b7e4c0; color: #1a7f37; }
+.sfm-msg--err { background: #fcebea; border: 1px solid #f0b3ae; color: #b32d2e; }
+
+.sfm-table { margin-top: 0; }
+.sfm-table th.sfm-col-size, .sfm-table td.sfm-col-size,
+.sfm-table th.sfm-col-modified, .sfm-table td.sfm-col-modified,
+.sfm-table th.sfm-col-perms, .sfm-table td.sfm-col-perms { white-space: nowrap; }
+.sfm-col-size { width: 110px; }
+.sfm-col-modified { width: 170px; }
+.sfm-col-perms { width: 80px; }
+.sfm-col-act { width: 220px; }
+.sfm-loading, .sfm-empty { text-align: center; color: #646970; padding: 24px !important; }
+
+.sfm-name { display: flex; align-items: center; gap: 8px; }
+.sfm-icon { font-size: 16px; line-height: 1; }
+.sfm-name a.sfm-open { text-decoration: none; cursor: pointer; font-weight: 500; }
+.sfm-name .sfm-file-name { color: #1d2327; }
+
+.sfm-row-act { display: flex; gap: 4px; flex-wrap: wrap; }
+.sfm-row-act .button-link { color: #2271b1; text-decoration: none; padding: 2px 4px; cursor: pointer; }
+.sfm-row-act .sfm-del { color: #b32d2e; }
+.sfm-perms { font-family: monospace; color: #646970; }
+.sfm-ro { color: #bb5000; font-size: 11px; }
+
+.sfm-autoupdate { margin-top: 18px; color: #1d2327; }
+.sfm-autoupdate-hint { color: #646970; font-size: 12px; margin-left: 4px; }
+
+/* 모달 */
+.sfm-modal {
+	position: fixed; inset: 0; background: rgba(0,0,0,.45);
+	display: flex; align-items: center; justify-content: center; z-index: 100000;
+}
+.sfm-modal-box {
+	background: #fff; border-radius: 8px; width: min(900px, 92vw);
+	max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.3);
+}
+.sfm-modal-head { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #dcdcde; }
+.sfm-modal-head strong { flex: 1; font-size: 14px; }
+.sfm-modal-close { text-decoration: none; font-size: 16px; color: #646970; cursor: pointer; }
+.sfm-modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid #dcdcde; }
+.sfm-spacer { flex: 1; }
+.sfm-editor-status { color: #646970; font-size: 12px; }
+
+#sfm-editor-text {
+	flex: 1; width: 100%; min-height: 46vh; border: 0; resize: none;
+	font-family: Menlo, Consolas, monospace; font-size: 13px; line-height: 1.5;
+	padding: 14px 16px; box-sizing: border-box; white-space: pre; overflow: auto;
+}
+#sfm-editor-text[readonly] { background: #f6f7f7; color: #50575e; }

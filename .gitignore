@@ -1,0 +1,6 @@
+# 빌드 산출물(릴리스 자산으로 첨부)
+safe-file-manager-v*.zip
+
+# 로컬/에디터
+.DS_Store
+.claude/
