@@ -3,7 +3,7 @@ Contributors: you
 Requires at least: 5.0
 Tested up to: 6.6
 Requires PHP: 7.0
-Stable tag: 1.0.9
+Stable tag: 1.0.10
 License: GPLv2 or later
 
 취약한 WP File Manager(elFinder) 대체용 안전 파일 관리자. 워드프레스 관리자 화면에서 서버 파일을 열람·편집·업로드·다운로드합니다.

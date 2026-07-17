@@ -690,7 +690,37 @@
 		} );
 		window.addEventListener( 'resize', hideCtxMenu );
 		el.main = el.list.closest( '.sfm-main' );
-		if ( el.main ) { el.main.addEventListener( 'scroll', hideCtxMenu ); }
+		if ( el.main ) {
+			el.main.addEventListener( 'scroll', hideCtxMenu );
+			// 드래그앤드롭 업로드 — .sfm-main 위에 파일을 끌어다 놓으면 현재 폴더로 업로드(input change와 동일 경로).
+			function isFileDrag( e ) {
+				return e.dataTransfer && Array.prototype.indexOf.call( e.dataTransfer.types || [], 'Files' ) !== -1;
+			}
+			el.main.addEventListener( 'dragover', function ( e ) {
+				if ( ! isFileDrag( e ) ) { return; }
+				e.preventDefault();
+				e.dataTransfer.dropEffect = 'copy';
+				el.main.classList.add( 'sfm-dragover' );
+			} );
+			el.main.addEventListener( 'dragleave', function ( e ) {
+				// 자식 요소로 옮겨갈 때의 dragleave 깜빡임 방지 — 컨테이너 밖으로 나갈 때만 해제.
+				if ( ! el.main.contains( e.relatedTarget ) ) { el.main.classList.remove( 'sfm-dragover' ); }
+			} );
+			el.main.addEventListener( 'drop', function ( e ) {
+				if ( ! isFileDrag( e ) ) { return; }
+				e.preventDefault();
+				el.main.classList.remove( 'sfm-dragover' );
+				var files = e.dataTransfer.files;
+				if ( ! files || ! files.length ) { return; }
+				// 실수 방지 — 업로드 전 개수·파일명을 보여주고 승인받는다.
+				var names = Array.prototype.map.call( files, function ( f ) { return f.name; } );
+				var preview = names.slice( 0, 8 ).join( '\n· ' );
+				if ( names.length > 8 ) { preview += '\n… 외 ' + ( names.length - 8 ) + '개'; }
+				if ( confirm( '현재 폴더에 파일 ' + files.length + '개를 업로드할까요?\n\n· ' + preview ) ) {
+					uploadFiles( files );
+				}
+			} );
+		}
 		$( 'sfm-download-folder' ).addEventListener( 'click', function () {
 			msg( '현재 폴더를 압축하는 중… 크기가 크면 시간이 걸립니다.', false );
 			download( cwd );
