@@ -70,6 +70,10 @@
 .sfm-table th.sfm-col-size, .sfm-table td.sfm-col-size,
 .sfm-table th.sfm-col-modified, .sfm-table td.sfm-col-modified,
 .sfm-table th.sfm-col-perms, .sfm-table td.sfm-col-perms { white-space: nowrap; }
+.sfm-table th.sfm-sortable { cursor: pointer; user-select: none; -webkit-user-select: none; }
+.sfm-table th.sfm-sortable:hover { color: #2271b1; }
+.sfm-table th.sfm-sorted { color: #2271b1; }
+.sfm-sort-ind { font-size: 11px; }
 .sfm-col-size { width: 110px; }
 .sfm-col-modified { width: 170px; }
 .sfm-col-perms { width: 80px; }

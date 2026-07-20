@@ -3,7 +3,7 @@ Contributors: you
 Requires at least: 5.0
 Tested up to: 6.6
 Requires PHP: 7.0
-Stable tag: 1.0.10
+Stable tag: 1.0.11
 License: GPLv2 or later
 
 취약한 WP File Manager(elFinder) 대체용 안전 파일 관리자. 워드프레스 관리자 화면에서 서버 파일을 열람·편집·업로드·다운로드합니다.
@@ -32,6 +32,9 @@ License: GPLv2 or later
 * 필터 `sfm_base_dir` — 접근 루트를 특정 폴더로 좁힐 수 있습니다.
 
 == 변경 이력 ==
+
+= 1.0.11 =
+* 오른쪽 목록 정렬 — 상단 열 제목(이름·크기·수정일·권한)을 클릭하면 그 기준으로 정렬. 다시 누르면 오름/내림 전환(폴더는 항상 위).
 
 = 1.0.9 =
 * 실수 삭제 방지 — 모든 우클릭 메뉴(오른쪽 목록·왼쪽 트리)에서 "삭제" 항목 제거. 삭제는 맨 오른쪽 작업 열의 삭제 버튼으로만.

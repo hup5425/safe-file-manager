@@ -3,6 +3,7 @@
 	'use strict';
 
 	var cwd = '';        // 현재 폴더(base 기준 상대경로)
+	var lastData = null; // 마지막으로 받은 폴더 목록(정렬 다시 그릴 때 사용)
 	var el = {};
 	var nodeMap = {};    // rel -> 트리 노드 element
 	var histStack = [];  // 방문 경로 히스토리(앞으로/뒤로)
@@ -109,16 +110,65 @@
 	}
 
 	function render( data ) {
+		lastData = data; // 다시 정렬해 그릴 수 있게 원본 목록 보관.
 		renderBreadcrumb( data.path );
 		el.up.disabled = ( data.parent === null );
 		anchorRel = null; // 폴더가 바뀌면 선택/기준 초기화.
+		renderRows();
+	}
 
-		if ( ! data.entries.length ) {
+	/* ------------------------------ 정렬 ------------------------------ */
+
+	var sortKey = null; // null 이면 서버가 준 순서 그대로. 'name'|'size'|'modified'|'perms'.
+	var sortDir = 1;    // 1=오름차순, -1=내림차순.
+
+	function compareBy( a, b, key ) {
+		if ( 'size' === key ) { return ( a.size || 0 ) - ( b.size || 0 ); }
+		if ( 'modified' === key ) { return ( a.modified || 0 ) - ( b.modified || 0 ); }
+		if ( 'perms' === key ) { return String( a.perms ).localeCompare( String( b.perms ) ); }
+		// 이름(기본) — 한글·숫자 자연스러운 순서.
+		return String( a.name ).localeCompare( String( b.name ), undefined, { numeric: true, sensitivity: 'base' } );
+	}
+
+	// 폴더를 항상 위로 유지한 채, 각 그룹 안에서 선택한 열 기준으로 정렬.
+	function sortEntries( entries ) {
+		var arr = entries.slice();
+		arr.sort( function ( a, b ) {
+			if ( a.type !== b.type ) { return 'dir' === a.type ? -1 : 1; }
+			return compareBy( a, b, sortKey ) * sortDir;
+		} );
+		return arr;
+	}
+
+	function updateSortIndicators() {
+		if ( ! el.thead ) { return; }
+		var ths = el.thead.querySelectorAll( 'th[data-sort]' );
+		Array.prototype.forEach.call( ths, function ( th ) {
+			var ind = th.querySelector( '.sfm-sort-ind' );
+			var on = ( th.getAttribute( 'data-sort' ) === sortKey );
+			th.classList.toggle( 'sfm-sorted', on );
+			if ( ind ) { ind.textContent = on ? ( sortDir > 0 ? ' ▲' : ' ▼' ) : ''; }
+		} );
+	}
+
+	// 헤더 클릭: 같은 열이면 방향 토글, 다른 열이면 그 열 오름차순부터.
+	function onHeadClick( e ) {
+		var th = e.target.closest( 'th[data-sort]' );
+		if ( ! th ) { return; }
+		var key = th.getAttribute( 'data-sort' );
+		if ( sortKey === key ) { sortDir = -sortDir; } else { sortKey = key; sortDir = 1; }
+		renderRows();
+	}
+
+	function renderRows() {
+		updateSortIndicators();
+		if ( ! lastData || ! lastData.entries.length ) {
 			el.list.innerHTML = '<tr><td colspan="5" class="sfm-empty">빈 폴더입니다.</td></tr>';
 			return;
 		}
 
-		var rows = data.entries.map( function ( e ) {
+		var entries = sortKey ? sortEntries( lastData.entries ) : lastData.entries;
+		var rows = entries.map( function ( e ) {
 			var icon = e.type === 'dir' ? '📁' : '📄';
 			// 이름은 클릭 링크가 아니라 텍스트 — 한 번 클릭=선택, 더블클릭=열기(행 전체).
 			var nameCell = '<span class="sfm-file-name">' + esc( e.name ) + '</span>';
@@ -657,6 +707,9 @@
 		el.editorText = $( 'sfm-editor-text' );
 		el.editorStatus = $( 'sfm-editor-status' );
 		el.editorSave = $( 'sfm-editor-save' );
+
+		el.thead = el.list.closest( 'table' ).querySelector( 'thead' );
+		if ( el.thead ) { el.thead.addEventListener( 'click', onHeadClick ); }
 
 		el.tree.addEventListener( 'click', onTreeClick );
 		el.tree.addEventListener( 'dblclick', onTreeDblClick );

@@ -53,10 +53,10 @@ $sfm_base = SFM_FM::base_dir();
 			<table class="widefat striped sfm-table">
 				<thead>
 					<tr>
-						<th class="sfm-col-name">이름</th>
-						<th class="sfm-col-size">크기</th>
-						<th class="sfm-col-modified">수정일</th>
-						<th class="sfm-col-perms">권한</th>
+						<th class="sfm-col-name sfm-sortable" data-sort="name" title="이름순 정렬">이름<span class="sfm-sort-ind"></span></th>
+						<th class="sfm-col-size sfm-sortable" data-sort="size" title="크기순 정렬">크기<span class="sfm-sort-ind"></span></th>
+						<th class="sfm-col-modified sfm-sortable" data-sort="modified" title="수정일순 정렬">수정일<span class="sfm-sort-ind"></span></th>
+						<th class="sfm-col-perms sfm-sortable" data-sort="perms" title="권한순 정렬">권한<span class="sfm-sort-ind"></span></th>
 						<th class="sfm-col-act">작업</th>
 					</tr>
 				</thead>
